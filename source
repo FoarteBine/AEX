@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "6.4.2"
+currentVersion = "0.1"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -343,17 +343,20 @@ function aexRound(obj, radius, side)
 	-- side: nil = all corners, "top" = top only, "bottom" = bottom only
 	if typeof(obj) ~= "Instance" or not obj:IsA("GuiObject") then return end
 	if obj:FindFirstChild("AEXCorner") then return end
+	obj:SetAttribute("AEXBaseRadius", radius)
+	local scale = (cornerRadius or 10) / 10
+	local r = math.max(0, math.floor(radius * scale + 0.5))
 	local corner = Instance.new("UICorner")
 	corner.Name = "AEXCorner"
-	corner.CornerRadius = UDim.new(0, radius)
+	corner.CornerRadius = UDim.new(0, r)
 	corner.Parent = obj
 	if side == "top" or side == "bottom" then
 		local patch = Instance.new("Frame")
 		patch.Name = "AEXPatch"
 		patch.BorderSizePixel = 0
 		patch.BackgroundTransparency = 0
-		patch.Size = UDim2.new(1, 0, 0, radius)
-		patch.Position = (side == "top") and UDim2.new(0, 0, 1, -radius) or UDim2.new(0, 0, 0, 0)
+		patch.Size = UDim2.new(1, 0, 0, r)
+		patch.Position = (side == "top") and UDim2.new(0, 0, 1, -r) or UDim2.new(0, 0, 0, 0)
 		patch.ZIndex = obj.ZIndex - 1
 		patch.Parent = obj
 		local function sync()
@@ -397,6 +400,72 @@ function aexStroke(obj, transparency, color)
 	stroke.Thickness = 1
 	stroke.Transparency = transparency or 0.55
 	stroke.Parent = obj
+end
+
+function applyThemeRadius()
+	local scale = (cornerRadius or 10) / 10
+	for _, d in ipairs(ScaledHolder:GetDescendants()) do
+		local base = d:GetAttribute("AEXBaseRadius")
+		if base then
+			local r = math.max(0, math.floor(base * scale + 0.5))
+			local corner = d:FindFirstChild("AEXCorner")
+			if corner then
+				corner.CornerRadius = UDim.new(0, r)
+			end
+			local patch = d:FindFirstChild("AEXPatch")
+			if patch then
+				patch.Size = UDim2.new(1, 0, 0, r)
+				if patch.Position.Y.Offset < 0 then
+					patch.Position = UDim2.new(0, 0, 1, -r)
+				end
+			end
+		end
+	end
+end
+
+function applyThemeFont()
+	local fams = {
+		Gotham = {Enum.Font.Gotham, Enum.Font.GothamMedium, Enum.Font.GothamBold, Enum.Font.GothamBlack};
+		GothamMedium = {Enum.Font.GothamMedium, Enum.Font.GothamMedium, Enum.Font.GothamMedium, Enum.Font.GothamMedium};
+		GothamBold = {Enum.Font.GothamBold, Enum.Font.GothamBold, Enum.Font.GothamBold, Enum.Font.GothamBold};
+		GothamBlack = {Enum.Font.GothamBlack, Enum.Font.GothamBlack, Enum.Font.GothamBlack, Enum.Font.GothamBlack};
+		Roboto = {Enum.Font.Roboto, Enum.Font.Roboto, Enum.Font.RobotoCondensed, Enum.Font.RobotoMono};
+		RobotoCondensed = {Enum.Font.RobotoCondensed, Enum.Font.RobotoCondensed, Enum.Font.RobotoCondensed, Enum.Font.RobotoCondensed};
+		Ubuntu = {Enum.Font.Ubuntu, Enum.Font.Ubuntu, Enum.Font.Ubuntu, Enum.Font.Ubuntu};
+		Nunito = {Enum.Font.Nunito, Enum.Font.Nunito, Enum.Font.Nunito, Enum.Font.Nunito};
+		Oswald = {Enum.Font.Oswald, Enum.Font.Oswald, Enum.Font.Oswald, Enum.Font.Oswald};
+		TitilliumWeb = {Enum.Font.TitilliumWeb, Enum.Font.TitilliumWeb, Enum.Font.TitilliumWeb, Enum.Font.TitilliumWeb};
+		JosefinSans = {Enum.Font.JosefinSans, Enum.Font.JosefinSans, Enum.Font.JosefinSans, Enum.Font.JosefinSans};
+		Michroma = {Enum.Font.Michroma, Enum.Font.Michroma, Enum.Font.Michroma, Enum.Font.Michroma};
+		FredokaOne = {Enum.Font.FredokaOne, Enum.Font.FredokaOne, Enum.Font.FredokaOne, Enum.Font.FredokaOne};
+		BuilderSans = {Enum.Font.BuilderSans, Enum.Font.BuilderSansMedium, Enum.Font.BuilderSansBold, Enum.Font.BuilderSansExtraBold};
+		Code = {Enum.Font.Code, Enum.Font.Code, Enum.Font.Code, Enum.Font.Code};
+		SourceSans = {Enum.Font.SourceSans, Enum.Font.SourceSansSemibold, Enum.Font.SourceSansBold, Enum.Font.SourceSansBold};
+		Arimo = {Enum.Font.Arimo, Enum.Font.Arimo, Enum.Font.ArimoBold, Enum.Font.ArimoBold};
+	}
+	if not fams[uiFont] then uiFont = "Gotham" end
+	local fam = fams[uiFont]
+	local delta = (textSize or 14) - 14
+	for _, d in ipairs(ScaledHolder:GetDescendants()) do
+		if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+			if not d:GetAttribute("AEXFW") then
+				local fw = 1
+				if d.Font == Enum.Font.GothamMedium then fw = 2
+				elseif d.Font == Enum.Font.GothamSemibold or d.Font == Enum.Font.GothamBold then fw = 3
+				elseif d.Font == Enum.Font.GothamBlack then fw = 4 end
+				d:SetAttribute("AEXFW", fw)
+			end
+			d.Font = fam[d:GetAttribute("AEXFW")]
+			if not d.TextScaled then
+				local base = d:GetAttribute("AEXBaseTS")
+				if base == nil then
+					base = d.TextSize
+					d:SetAttribute("AEXBaseTS", base)
+				end
+				d.TextSize = math.max(8, math.floor(base + delta + 0.5))
+			end
+		end
+	end
 end
 -- // ======== AEX Modern UI helpers ========
 
@@ -3012,6 +3081,9 @@ currentShade3 = Color3.fromRGB(48, 52, 63)
 currentText1 = Color3.fromRGB(235, 238, 245)
 currentText2 = Color3.fromRGB(23, 25, 31)
 currentScroll = Color3.fromRGB(86, 92, 110)
+cornerRadius = 10
+uiFont = "Gotham"
+textSize = 14
 
 defaultGuiScale = IsOnMobile and 0.9 or 1
 defaultsettings = {
@@ -3032,6 +3104,9 @@ defaultsettings = {
 	currentText1 = {currentText1.R,currentText1.G,currentText1.B};
 	currentText2 = {currentText2.R,currentText2.G,currentText2.B};
 	currentScroll = {currentScroll.R,currentScroll.G,currentScroll.B};
+	cornerRadius = 10;
+	uiFont = "Gotham";
+	textSize = 14;
 	eventBinds = eventEditor.SaveData()
 }
 
@@ -3050,6 +3125,9 @@ useFactorySettings = function()
 	binds = {}
 	WayPoints = {}
 	PluginsTable = {}
+	cornerRadius = 10
+	uiFont = "Gotham"
+	textSize = 14
 end
 
 function createPopup(title, text)
@@ -3167,6 +3245,9 @@ function saves()
 					if vtype(json.currentText1, "table") then currentText1 = Color3.new(json.currentText1[1],json.currentText1[2],json.currentText1[3]) end
 					if vtype(json.currentText2, "table") then currentText2 = Color3.new(json.currentText2[1],json.currentText2[2],json.currentText2[3]) end
 					if vtype(json.currentScroll, "table") then currentScroll = Color3.new(json.currentScroll[1],json.currentScroll[2],json.currentScroll[3]) end
+					if vtype(json.cornerRadius, "number") then cornerRadius = math.clamp(math.floor(json.cornerRadius), 0, 20) else cornerRadius = 10 end
+					if vtype(json.uiFont, "string") then uiFont = json.uiFont else uiFont = "Gotham" end
+					if vtype(json.textSize, "number") then textSize = math.clamp(math.floor(json.textSize), 12, 18) else textSize = 14 end
 					if vtype(json.eventBinds, "string") then loadedEventData = json.eventBinds end
 				end)
 				if not success then
@@ -3236,6 +3317,9 @@ function updatesaves()
 			currentText1 = {currentText1.R,currentText1.G,currentText1.B};
 			currentText2 = {currentText2.R,currentText2.G,currentText2.B};
 			currentScroll = {currentScroll.R,currentScroll.G,currentScroll.B};
+			cornerRadius = cornerRadius or 10;
+			uiFont = uiFont or "Gotham";
+			textSize = textSize or 14;
 			eventBinds = eventEditor.SaveData()
 		}
 		writefileCooldown("AEX_FE.aex", HttpService:JSONEncode(update))
@@ -3534,16 +3618,574 @@ function updateColors(color,ctype)
 		end
 		currentScroll = color
 	end
+	if refreshThemeStudio then refreshThemeStudio() end
 end
 
+-- // ======== AEX Theme Studio ========
 local colorpickerOpen = false
+local themeStudioOpen = false
+local activeRoleKey = "shade1"
+local cacheCols = {}
+local roleSwatches = {}
+local studioRefs = {shade1 = {}, shade2 = {}, shade3 = {}, text1 = {}}
+local themeStudio
+local picker
+local Npicker
+local radiusSlider, sizeSlider, fontSync
+local openRolePicker
+local ensurePicker
+
+local FONT_LIST = {"Gotham", "GothamMedium", "GothamBold", "GothamBlack", "Roboto", "RobotoCondensed", "Ubuntu", "Nunito", "Oswald", "TitilliumWeb", "JosefinSans", "Michroma", "FredokaOne", "BuilderSans", "Code"}
+
+local ROLE_DEFS = {
+	{name = "Shade 1", key = "shade1"};
+	{name = "Shade 2", key = "shade2"};
+	{name = "Shade 3", key = "shade3"};
+	{name = "Text 1", key = "text1"};
+	{name = "Text 2", key = "text2"};
+	{name = "Scroll", key = "scroll"};
+}
+
+local function roleTableByKey(key)
+	if key == "shade1" then return shade1
+	elseif key == "shade2" then return shade2
+	elseif key == "shade3" then return shade3
+	elseif key == "text1" then return text1
+	elseif key == "text2" then return text2
+	elseif key == "scroll" then return scroll end
+	return shade1
+end
+
+local function currentColorByKey(key)
+	if key == "shade1" then return currentShade1
+	elseif key == "shade2" then return currentShade2
+	elseif key == "shade3" then return currentShade3
+	elseif key == "text1" then return currentText1
+	elseif key == "text2" then return currentText2
+	elseif key == "scroll" then return currentScroll end
+	return currentShade1
+end
+
+local function makeSection(parent, y, text)
+	local label = Instance.new("TextLabel")
+	label.Name = randomString()
+	label.BackgroundTransparency = 1
+	label.Position = UDim2.new(0, 12, 0, y)
+	label.Size = UDim2.new(1, -24, 0, 12)
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 11
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextColor3 = AEX_ACCENT_SOFT
+	label.Text = text
+	label.Parent = parent
+	return label
+end
+
+local function makeSlider(parent, y, minV, maxV, getValue, setValue, onCommit, fmt)
+	local track = Instance.new("Frame")
+	track.Name = randomString()
+	track.Position = UDim2.new(0, 10, 0, y + 7)
+	track.Size = UDim2.new(1, -70, 0, 6)
+	track.BackgroundColor3 = currentShade3
+	track.BorderSizePixel = 0
+	track.Parent = parent
+	aexRound(track, 3)
+	table.insert(studioRefs.shade3, track)
+
+	local fill = Instance.new("Frame")
+	fill.Name = randomString()
+	fill.Size = UDim2.new(0, 0, 1, 0)
+	fill.BackgroundColor3 = AEX_ACCENT
+	fill.BorderSizePixel = 0
+	fill.ZIndex = 1
+	fill.Parent = track
+	aexRound(fill, 3)
+
+	local knob = Instance.new("Frame")
+	knob.Name = randomString()
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.Position = UDim2.new(0, 0, 0.5, 0)
+	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	knob.BorderSizePixel = 0
+	knob.ZIndex = 2
+	knob.Parent = track
+	aexRound(knob, 7)
+
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.Name = randomString()
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Position = UDim2.new(1, -58, 0, y)
+	valueLabel.Size = UDim2.new(0, 48, 0, 20)
+	valueLabel.Font = Enum.Font.Gotham
+	valueLabel.TextSize = 13
+	valueLabel.TextColor3 = currentText1
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+	valueLabel.Text = tostring(getValue())
+	valueLabel.Parent = parent
+	table.insert(studioRefs.text1, valueLabel)
+
+	local function syncVisual(v)
+		local rel = math.clamp((v - minV) / (maxV - minV), 0, 1)
+		fill.Size = UDim2.new(rel, 0, 1, 0)
+		knob.Position = UDim2.new(rel, 0, 0.5, 0)
+		valueLabel.Text = fmt and fmt(v) or tostring(v)
+	end
+
+	local function setFromX(x)
+		local rel = (x - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X)
+		rel = math.clamp(rel, 0, 1)
+		local v = math.floor(minV + (maxV - minV) * rel + 0.5)
+		if v ~= getValue() then
+			setValue(v)
+		end
+		syncVisual(v)
+	end
+
+	local hit = Instance.new("Frame")
+	hit.Name = randomString()
+	hit.BackgroundTransparency = 1
+	hit.Position = UDim2.new(0, 4, 0, y)
+	hit.Size = UDim2.new(1, -70, 0, 20)
+	hit.BorderSizePixel = 0
+	hit.ZIndex = 3
+	hit.Active = true
+	hit.Parent = parent
+
+	hit.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			local moveEvent, releaseEvent
+			releaseEvent = UserInputService.InputEnded:Connect(function(inp)
+				if inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+				releaseEvent:Disconnect()
+				if moveEvent then moveEvent:Disconnect() end
+				if onCommit then onCommit() end
+			end)
+			moveEvent = UserInputService.InputChanged:Connect(function(inp)
+				if inp.UserInputType == Enum.UserInputType.MouseMovement then
+					setFromX(AEXMouse.X)
+				end
+			end)
+			setFromX(AEXMouse.X)
+		end
+	end)
+
+	syncVisual(getValue())
+	return {sync = function() syncVisual(getValue()) end}
+end
+
+local function buildThemeStudio()
+	if themeStudio then return end
+	themeStudio = Instance.new("Frame")
+	themeStudio.Name = randomString()
+	themeStudio.Size = UDim2.new(0, 300, 0, 282)
+	themeStudio.Position = UDim2.new(0.5, -150, 0, -400)
+	themeStudio.BackgroundTransparency = 1
+	themeStudio.Active = true
+	themeStudio.Parent = ScaledHolder
+
+	local bar = Instance.new("Frame")
+	bar.Name = "Drag"
+	bar.Size = UDim2.new(1, 0, 0, 26)
+	bar.BackgroundColor3 = currentShade2
+	bar.BorderSizePixel = 0
+	bar.Parent = themeStudio
+	aexRound(bar, 10, "top")
+	table.insert(studioRefs.shade2, bar)
+
+	local accentBar = Instance.new("Frame")
+	accentBar.Name = randomString()
+	accentBar.Position = UDim2.new(0, 0, 1, -2)
+	accentBar.Size = UDim2.new(1, 0, 0, 2)
+	accentBar.BackgroundColor3 = AEX_ACCENT
+	accentBar.BorderSizePixel = 0
+	accentBar.ZIndex = 2
+	accentBar.Parent = bar
+
+	local studioTitle = Instance.new("TextLabel")
+	studioTitle.Name = randomString()
+	studioTitle.BackgroundTransparency = 1
+	studioTitle.Position = UDim2.new(0, 12, 0, 0)
+	studioTitle.Size = UDim2.new(1, -60, 1, 0)
+	studioTitle.Font = Enum.Font.Gotham
+	studioTitle.TextSize = 13
+	studioTitle.TextXAlignment = Enum.TextXAlignment.Left
+	studioTitle.TextColor3 = currentText1
+	studioTitle.Text = "AEX Theme Studio"
+	studioTitle.Parent = bar
+	table.insert(studioRefs.text1, studioTitle)
+
+	local studioExit = Instance.new("TextButton")
+	studioExit.Name = randomString()
+	studioExit.Position = UDim2.new(1, -26, 0, 0)
+	studioExit.Size = UDim2.new(0, 26, 0, 26)
+	studioExit.BackgroundTransparency = 1
+	studioExit.Font = Enum.Font.GothamBold
+	studioExit.TextSize = 14
+	studioExit.Text = "X"
+	studioExit.TextColor3 = currentText1
+	studioExit.Parent = bar
+	table.insert(studioRefs.text1, studioExit)
+	studioExit.MouseButton1Click:Connect(function()
+		themeStudioOpen = false
+		themeStudio:TweenPosition(UDim2.new(0.5, -150, 0, -400), "InOut", "Quart", 0.35, true, nil)
+	end)
+
+	local body = Instance.new("Frame")
+	body.Name = randomString()
+	body.Position = UDim2.new(0, 0, 0, 26)
+	body.Size = UDim2.new(1, 0, 1, -26)
+	body.BackgroundColor3 = currentShade1
+	body.BorderSizePixel = 0
+	body.Parent = themeStudio
+	aexRound(body, 10, "bottom")
+	table.insert(studioRefs.shade1, body)
+
+	makeSection(body, 6, "COLORS")
+
+	for i, def in ipairs(ROLE_DEFS) do
+		local col = (i - 1) % 3
+		local rown = math.floor((i - 1) / 3)
+		local btn = Instance.new("TextButton")
+		btn.Name = randomString()
+		btn.Position = UDim2.new(0, 10 + col * 94, 0, 22 + rown * 30)
+		btn.Size = UDim2.new(0, 90, 0, 26)
+		btn.BackgroundColor3 = currentShade2
+		btn.BorderSizePixel = 0
+		btn.Text = ""
+		btn.AutoButtonColor = false
+		btn.Parent = body
+		aexRound(btn, 6)
+		aexStroke(btn, 0.5)
+		aexHover(btn)
+		table.insert(studioRefs.shade2, btn)
+
+		local chip = Instance.new("Frame")
+		chip.Name = randomString()
+		chip.Position = UDim2.new(0, 7, 0.5, -7)
+		chip.Size = UDim2.new(0, 14, 0, 14)
+		chip.BackgroundColor3 = currentColorByKey(def.key)
+		chip.BorderSizePixel = 0
+		chip.ZIndex = 2
+		chip.Parent = btn
+		aexRound(chip, 4)
+
+		local chipText = Instance.new("TextLabel")
+		chipText.Name = randomString()
+		chipText.BackgroundTransparency = 1
+		chipText.Position = UDim2.new(0, 28, 0, 0)
+		chipText.Size = UDim2.new(1, -32, 1, 0)
+		chipText.Font = Enum.Font.Gotham
+		chipText.TextSize = 12
+		chipText.TextXAlignment = Enum.TextXAlignment.Left
+		chipText.TextColor3 = currentText1
+		chipText.Text = def.name
+		chipText.ZIndex = 2
+		chipText.Parent = btn
+		table.insert(studioRefs.text1, chipText)
+
+		btn.MouseButton1Click:Connect(function()
+			openRolePicker(def.key)
+		end)
+
+		roleSwatches[def.key] = {chip = chip, key = def.key}
+	end
+
+	makeSection(body, 86, "CORNER RADIUS")
+	radiusSlider = makeSlider(body, 102, 0, 20,
+		function() return cornerRadius end,
+		function(v) cornerRadius = v applyThemeRadius() end,
+		function() updatesaves() end,
+		function(v) return v .. "px" end
+	)
+
+	makeSection(body, 130, "FONT")
+
+	local fontPrev = Instance.new("TextButton")
+	fontPrev.Name = randomString()
+	fontPrev.Position = UDim2.new(0, 10, 0, 146)
+	fontPrev.Size = UDim2.new(0, 24, 0, 22)
+	fontPrev.BackgroundColor3 = currentShade3
+	fontPrev.BorderSizePixel = 0
+	fontPrev.Font = Enum.Font.GothamBold
+	fontPrev.Text = "<"
+	fontPrev.TextSize = 13
+	fontPrev.TextColor3 = currentText1
+	fontPrev.AutoButtonColor = false
+	fontPrev.Parent = body
+	aexRound(fontPrev, 5)
+	aexHover(fontPrev)
+	table.insert(studioRefs.shade3, fontPrev)
+	table.insert(studioRefs.text1, fontPrev)
+
+	local fontNext = Instance.new("TextButton")
+	fontNext.Name = randomString()
+	fontNext.Position = UDim2.new(1, -34, 0, 146)
+	fontNext.Size = UDim2.new(0, 24, 0, 22)
+	fontNext.BackgroundColor3 = currentShade3
+	fontNext.BorderSizePixel = 0
+	fontNext.Font = Enum.Font.GothamBold
+	fontNext.Text = ">"
+	fontNext.TextSize = 13
+	fontNext.TextColor3 = currentText1
+	fontNext.AutoButtonColor = false
+	fontNext.Parent = body
+	aexRound(fontNext, 5)
+	aexHover(fontNext)
+	table.insert(studioRefs.shade3, fontNext)
+	table.insert(studioRefs.text1, fontNext)
+
+	local fontLabel = Instance.new("TextLabel")
+	fontLabel.Name = randomString()
+	fontLabel.Position = UDim2.new(0, 40, 0, 146)
+	fontLabel.Size = UDim2.new(1, -80, 0, 22)
+	fontLabel.BackgroundColor3 = currentShade2
+	fontLabel.BorderSizePixel = 0
+	fontLabel.Font = Enum.Font.Gotham
+	fontLabel.TextSize = 13
+	fontLabel.TextColor3 = currentText1
+	fontLabel.Text = uiFont
+	fontLabel.Parent = body
+	aexRound(fontLabel, 5)
+	aexStroke(fontLabel, 0.5)
+	table.insert(studioRefs.shade2, fontLabel)
+	table.insert(studioRefs.text1, fontLabel)
+
+	fontSync = function()
+		fontLabel.Text = uiFont
+		local okf, f = pcall(function() return Enum.Font[uiFont] end)
+		if okf then fontLabel.Font = f end
+	end
+
+	local function stepFont(dir)
+		local idx = table.find(FONT_LIST, uiFont) or 1
+		idx = idx + dir
+		if idx < 1 then idx = #FONT_LIST elseif idx > #FONT_LIST then idx = 1 end
+		uiFont = FONT_LIST[idx]
+		applyThemeFont()
+		fontSync()
+		updatesaves()
+	end
+	fontPrev.MouseButton1Click:Connect(function() stepFont(-1) end)
+	fontNext.MouseButton1Click:Connect(function() stepFont(1) end)
+
+	makeSection(body, 176, "TEXT SIZE")
+	sizeSlider = makeSlider(body, 192, 12, 18,
+		function() return textSize end,
+		function(v) textSize = v applyThemeFont() end,
+		function() updatesaves() end
+	)
+
+	local resetBtn = Instance.new("TextButton")
+	resetBtn.Name = randomString()
+	resetBtn.Position = UDim2.new(0, 10, 0, 226)
+	resetBtn.Size = UDim2.new(1, -20, 0, 26)
+	resetBtn.BackgroundColor3 = currentShade3
+	resetBtn.BorderSizePixel = 0
+	resetBtn.Font = Enum.Font.Gotham
+	resetBtn.TextSize = 12
+	resetBtn.TextColor3 = currentText1
+	resetBtn.Text = "RESET THEME TO DEFAULTS"
+	resetBtn.AutoButtonColor = false
+	resetBtn.Parent = body
+	aexRound(resetBtn, 6)
+	aexStroke(resetBtn, 0.5)
+	aexHover(resetBtn)
+	table.insert(studioRefs.shade3, resetBtn)
+	table.insert(studioRefs.text1, resetBtn)
+	resetBtn.MouseButton1Click:Connect(function()
+		cornerRadius = 10
+		uiFont = "Gotham"
+		textSize = 14
+		updateColors(Color3.fromRGB(23, 25, 31), shade1)
+		updateColors(Color3.fromRGB(32, 35, 43), shade2)
+		updateColors(Color3.fromRGB(48, 52, 63), shade3)
+		updateColors(Color3.fromRGB(235, 238, 245), text1)
+		updateColors(Color3.fromRGB(23, 25, 31), text2)
+		updateColors(Color3.fromRGB(86, 92, 110), scroll)
+		applyThemeRadius()
+		applyThemeFont()
+		fontSync()
+		radiusSlider.sync()
+		sizeSlider.sync()
+		wait()
+		updatesaves()
+	end)
+
+	dragGUI(themeStudio)
+	applyThemeFont()
+end
+
+local function stylePickerAsset()
+	if not picker then return end
+	local pg = picker:FindFirstChild("ColorPicker")
+	if not pg then return end
+	pg.BackgroundColor3 = currentShade1
+	pg.BorderSizePixel = 0
+	pg.ClipsDescendants = true
+	aexRound(pg, 10)
+	aexStroke(pg, 0.45)
+
+	local tb = pg:FindFirstChild("TopBar")
+	if tb then
+		tb.BackgroundColor3 = currentShade2
+		tb.BorderSizePixel = 0
+		aexRound(tb, 10, "top")
+		local wt = tb:FindFirstChild("WindowTitle")
+		if wt then
+			wt.TextColor3 = currentText1
+			wt.Text = "AEX Color Picker"
+			wt.TextXAlignment = Enum.TextXAlignment.Left
+			wt.Position = UDim2.new(0, 10, 0, 0)
+			wt.Size = UDim2.new(1, -40, 1, 0)
+		end
+		local ex = tb:FindFirstChild("Exit")
+		if ex then
+			ex.BackgroundTransparency = 1
+			ex.TextColor3 = currentText1
+		end
+	end
+
+	local ct = pg:FindFirstChild("Content")
+	if ct then
+		ct.BackgroundColor3 = currentShade2
+		ct.BorderSizePixel = 0
+
+		for _, n in ipairs({"Shade1", "Shade2", "Shade3", "Text1", "Text2", "Scroll"}) do
+			local b = ct:FindFirstChild(n)
+			if b then b.Visible = false end
+		end
+
+		local cb = ct:FindFirstChild("Cancel")
+		if cb then
+			cb.Visible = true
+			cb.Position = UDim2.new(1, -262, 1, -24)
+			cb.Size = UDim2.new(0, 80, 0, 20)
+			cb.BackgroundColor3 = currentShade3
+			cb.BorderSizePixel = 0
+			cb.TextColor3 = currentText1
+			aexRound(cb, 5)
+			aexStroke(cb, 0.5)
+		end
+
+		local db = ct:FindFirstChild("Default")
+		if db then
+			db.Visible = true
+			db.Position = UDim2.new(1, -96, 1, -24)
+			db.Size = UDim2.new(0, 86, 0, 20)
+			db.BackgroundColor3 = AEX_ACCENT
+			db.BorderSizePixel = 0
+			db.TextColor3 = Color3.fromRGB(255, 255, 255)
+			aexRound(db, 5)
+			aexStroke(db, 0.5)
+		end
+
+		for _, n in ipairs({"Hue", "Sat", "Val", "Red", "Green", "Blue"}) do
+			local f = ct:FindFirstChild(n)
+			if f then
+				f.BackgroundColor3 = currentShade3
+				f.BorderSizePixel = 0
+				aexRound(f, 4)
+				local inp = f:FindFirstChild("Input")
+				if inp then
+					inp.BackgroundColor3 = currentShade3
+					inp.BorderSizePixel = 0
+					inp.TextColor3 = currentText1
+				end
+				local tt = f:FindFirstChild("Title")
+				if tt then tt.TextColor3 = currentText1 end
+			end
+		end
+
+		for _, n in ipairs({"BasicColors", "CustomColors"}) do
+			local f = ct:FindFirstChild(n)
+			if f then
+				if f:IsA("Frame") and f.BackgroundTransparency == 0 then
+					f.BackgroundColor3 = currentShade1
+					f.BorderSizePixel = 0
+					aexRound(f, 6)
+				end
+				local tt = f:FindFirstChild("Title")
+				if tt then tt.TextColor3 = currentText1 end
+				for _, c in ipairs(f:GetChildren()) do
+					if c.Name == "Choice" then
+						c.BorderSizePixel = 0
+						aexRound(c, 3)
+					end
+				end
+			end
+		end
+
+		local csf = ct:FindFirstChild("ColorSpaceFrame")
+		if csf then
+			csf.BackgroundColor3 = currentShade3
+			csf.BorderSizePixel = 0
+			aexRound(csf, 6)
+		end
+
+		local pv = ct:FindFirstChild("Preview")
+		if pv then
+			pv.BorderSizePixel = 0
+			aexRound(pv, 4)
+			aexStroke(pv, 0.5)
+		end
+	end
+	applyThemeFont()
+end
+
+openRolePicker = function(key)
+	activeRoleKey = key
+	if themeStudio then
+		themeStudio.Visible = false
+	end
+	ensurePicker()
+	if Npicker then
+		Npicker:SetColor(currentColorByKey(key))
+	end
+end
+
+refreshThemeStudio = function()
+	if not themeStudio then
+		return
+	end
+	for _, v in ipairs(studioRefs.shade1) do v.BackgroundColor3 = currentShade1 end
+	for _, v in ipairs(studioRefs.shade2) do v.BackgroundColor3 = currentShade2 end
+	for _, v in ipairs(studioRefs.shade3) do v.BackgroundColor3 = currentShade3 end
+	for _, v in ipairs(studioRefs.text1) do v.TextColor3 = currentText1 end
+	for _, sw in pairs(roleSwatches) do
+		sw.chip.BackgroundColor3 = currentColorByKey(sw.key)
+	end
+	if colorpickerOpen and picker then
+		stylePickerAsset()
+	end
+end
+
 ColorsButton.MouseButton1Click:Connect(function()
-	cache_currentShade1 = currentShade1
-	cache_currentShade2 = currentShade2
-	cache_currentShade3 = currentShade3
-	cache_currentText1 = currentText1
-	cache_currentText2 = currentText2
-	cache_currentScroll = currentScroll
+	if not themeStudioOpen then
+		themeStudioOpen = true
+		cacheCols.shade1 = currentShade1
+		cacheCols.shade2 = currentShade2
+		cacheCols.shade3 = currentShade3
+		cacheCols.text1 = currentText1
+		cacheCols.text2 = currentText2
+		cacheCols.scroll = currentScroll
+		buildThemeStudio()
+		refreshThemeStudio()
+		radiusSlider.sync()
+		sizeSlider.sync()
+		fontSync()
+		if colorpickerOpen and picker then
+			picker:TweenPosition(UDim2.new(0.5, -219, 0, -500), "InOut", "Quart", 0.35, true, nil)
+		end
+		themeStudio.Visible = true
+		themeStudio:TweenPosition(UDim2.new(0.5, -150, 0, 100), "InOut", "Quart", 0.35, true, nil)
+	else
+		themeStudioOpen = false
+		themeStudio:TweenPosition(UDim2.new(0.5, -150, 0, -400), "InOut", "Quart", 0.35, true, nil)
+	end
+end)
+
+ensurePicker = function()
 	if not colorpickerOpen then
 		colorpickerOpen = true
 		picker = game:GetObjects("rbxassetid://4908465318")[1]
@@ -3921,8 +4563,32 @@ ColorsButton.MouseButton1Click:Connect(function()
 				defaultButton.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement then defaultButton.BackgroundTransparency = 0.4 end end)
 				defaultButton.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement then defaultButton.BackgroundTransparency = 0 end end)
 
+				local applyButton = Instance.new("TextButton")
+				applyButton.Name = "AEXApply"
+				applyButton.Parent = pickerFrame
+				applyButton.BackgroundColor3 = AEX_ACCENT
+				applyButton.BorderSizePixel = 0
+				applyButton.Position = UDim2.new(1, -180, 1, -24)
+				applyButton.Size = UDim2.new(0, 80, 0, 20)
+				applyButton.Font = Enum.Font.GothamBold
+				applyButton.Text = "Apply"
+				applyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+				applyButton.TextSize = 13
+				applyButton.AutoButtonColor = false
+				applyButton.ZIndex = 11
+				aexRound(applyButton, 5)
+				aexStroke(applyButton, 0.5)
+				applyButton.MouseButton1Click:Connect(function()
+					if newMt.Confirm then newMt:Confirm(chosenColor) end
+				end)
+
 				pickerExit.MouseButton1Click:Connect(function()
-					picker:TweenPosition(UDim2.new(0.5, -219, 0, -500), "InOut", "Quart", 0.5, true, nil)
+					picker:TweenPosition(UDim2.new(0.5, -219, 0, -500), "InOut", "Quart", 0.35, true, nil)
+					if themeStudio then
+						themeStudio.Visible = true
+						themeStudioOpen = true
+						refreshThemeStudio()
+					end
 				end)
 
 				updateColor()
@@ -3937,17 +4603,19 @@ ColorsButton.MouseButton1Click:Connect(function()
 			end
 		end
 
-		picker:TweenPosition(UDim2.new(0.5, -219, 0, 100), "InOut", "Quart", 0.5, true, nil)
-
-		local Npicker = ColorPicker.new()
-		Npicker.Confirm = function(self,color,ctype) updateColors(color,ctype) wait() updatesaves() end
+		Npicker = ColorPicker.new()
+		Npicker.Confirm = function(self,color,ctype)
+			updateColors(color,roleTableByKey(activeRoleKey))
+			wait()
+			updatesaves()
+		end
 		Npicker.Cancel = function(self)
-			updateColors(cache_currentShade1,shade1)
-			updateColors(cache_currentShade2,shade2)
-			updateColors(cache_currentShade3,shade3)
-			updateColors(cache_currentText1,text1)
-			updateColors(cache_currentText2,text2)
-			updateColors(cache_currentScroll,scroll)
+			updateColors(cacheCols.shade1,shade1)
+			updateColors(cacheCols.shade2,shade2)
+			updateColors(cacheCols.shade3,shade3)
+			updateColors(cacheCols.text1,text1)
+			updateColors(cacheCols.text2,text2)
+			updateColors(cacheCols.scroll,scroll)
 			wait()
 			updatesaves()
 		end
@@ -3961,10 +4629,12 @@ ColorsButton.MouseButton1Click:Connect(function()
 			wait()
 			updatesaves()
 		end
+		stylePickerAsset()
+		picker:TweenPosition(UDim2.new(0.5, -219, 0, 100), "InOut", "Quart", 0.35, true, nil)
 	else
-		picker:TweenPosition(UDim2.new(0.5, -219, 0, 100), "InOut", "Quart", 0.5, true, nil)
+		picker:TweenPosition(UDim2.new(0.5, -219, 0, 100), "InOut", "Quart", 0.35, true, nil)
 	end
-end)
+end
 
 
 SettingsButton.MouseButton1Click:Connect(function()
@@ -13323,6 +13993,9 @@ do
 	end
 end
 -- // ===================== AEX Modern UI Pass =====================
+
+applyThemeRadius()
+applyThemeFont()
 
 if PluginsTable ~= nil or PluginsTable ~= {} then
 	FindPlugins(PluginsTable)
