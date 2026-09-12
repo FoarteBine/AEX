@@ -5690,6 +5690,7 @@ CMDs[#CMDs + 1] = {NAME = '', DESC = ''}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
+CMDs[#CMDs + 1] = {NAME = 'fly2 / tweenfly / tfly [speed]', DESC = 'Fly moved by TweenService (smooth, no physics forces)'}
 CMDs[#CMDs + 1] = {NAME = 'unfly', DESC = 'Disables fly'}
 CMDs[#CMDs + 1] = {NAME = 'flyspeed [num]', DESC = 'Set fly speed (default is 20)'}
 CMDs[#CMDs + 1] = {NAME = 'vehiclefly / vfly [speed]', DESC = 'Makes you fly in a vehicle'}
@@ -8423,7 +8424,27 @@ local mobilefly = function(speaker, vfly)
 	end)
 end
 
+-- // tween-based fly (fly2): moves RootPart with TweenService instead of BodyVelocity
+local tweenFlyConn
+local tflyKeyDown
+local tflyKeyUp
+local tflyTween
+function stopTweenFly()
+	FLYING = false
+	if tweenFlyConn then tweenFlyConn:Disconnect(); tweenFlyConn = nil end
+	if tflyKeyDown then tflyKeyDown:Disconnect(); tflyKeyDown = nil end
+	if tflyKeyUp then tflyKeyUp:Disconnect(); tflyKeyUp = nil end
+	if tflyTween then pcall(function() tflyTween:Cancel() end); tflyTween = nil end
+	local char = Players.LocalPlayer.Character
+	if char then
+		local hum = char:FindFirstChildWhichIsA("Humanoid")
+		if hum then hum.PlatformStand = false end
+	end
+	pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Custom end)
+end
+
 addcmd('fly',{},function(args, speaker)
+	stopTweenFly()
 	if not IsOnMobile then
 		NOFLY()
 		wait()
@@ -8443,11 +8464,68 @@ addcmd('flyspeed',{'flysp'},function(args, speaker)
 	end
 end)
 
-addcmd('unfly',{'nofly','novfly','unvehiclefly','novehiclefly','unvfly'},function(args, speaker)
+addcmd('unfly',{'nofly','novfly','unvehiclefly','novehiclefly','unvfly','unfly2','tweenflyoff'},function(args, speaker)
+	stopTweenFly()
 	if not IsOnMobile then NOFLY() else unmobilefly(speaker) end
 end)
 
+addcmd('fly2',{'tweenfly','tfly'},function(args, speaker)
+	local speed = aexflyspeed or 1
+	if args[1] and isNumber(args[1]) then
+		aexflyspeed = tonumber(args[1])
+		speed = aexflyspeed
+	end
+	NOFLY()
+	unmobilefly(speaker)
+	stopTweenFly()
+	if flyKeyDown or flyKeyUp then flyKeyDown:Disconnect() flyKeyUp:Disconnect() end
+	local char = speaker.Character
+	if not char then return end
+	local root = getRoot(char)
+	if not root then return end
+	local hum = char:FindFirstChildWhichIsA("Humanoid")
+	FLYING = true
+	if hum then hum.PlatformStand = true end
+	pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Track end)
+	local ctrl = {F = 0, B = 0, L = 0, R = 0, U = 0, D = 0}
+	local function setKey(k, v)
+		if k == Enum.KeyCode.W then ctrl.F = v
+		elseif k == Enum.KeyCode.S then ctrl.B = v
+		elseif k == Enum.KeyCode.A then ctrl.L = v
+		elseif k == Enum.KeyCode.D then ctrl.R = v
+		elseif k == Enum.KeyCode.Space or k == Enum.KeyCode.E then ctrl.U = v
+		elseif k == Enum.KeyCode.Q or k == Enum.KeyCode.C then ctrl.D = v end
+	end
+	tflyKeyDown = UserInputService.InputBegan:Connect(function(input, gp)
+		if gp then return end
+		setKey(input.KeyCode, 1)
+	end)
+	tflyKeyUp = UserInputService.InputEnded:Connect(function(input, gp)
+		if gp then return end
+		setKey(input.KeyCode, 0)
+	end)
+	tweenFlyConn = RunService.Heartbeat:Connect(function(dt)
+		if not FLYING then return end
+		root = getRoot(speaker.Character)
+		if not root then return end
+		local curHum = speaker.Character and speaker.Character:FindFirstChildWhichIsA("Humanoid")
+		if curHum and not curHum.PlatformStand then curHum.PlatformStand = true end
+		pcall(function()
+			root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+			root.Velocity = Vector3.new(0, 0, 0)
+		end)
+		local cf = workspace.CurrentCamera.CFrame
+		local dir = cf.RightVector * (ctrl.R - ctrl.L) - cf.LookVector * (ctrl.F - ctrl.B) + Vector3.new(0, ctrl.U - ctrl.D, 0)
+		if dir.Magnitude < 0.05 then return end
+		local target = root.CFrame.p + dir.Unit * math.clamp(speed * 55 * dt, 0, 60)
+		if tflyTween then pcall(function() tflyTween:Cancel() end) end
+		tflyTween = TweenService:Create(root, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {CFrame = CFrame.new(target)})
+		tflyTween:Play()
+	end)
+end)
+
 addcmd('vfly',{'vehiclefly'},function(args, speaker)
+	stopTweenFly()
 	if not IsOnMobile then
 		NOFLY()
 		wait()
