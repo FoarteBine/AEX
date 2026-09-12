@@ -8439,6 +8439,8 @@ function stopTweenFly()
 	if char then
 		local hum = char:FindFirstChildWhichIsA("Humanoid")
 		if hum then hum.PlatformStand = false end
+		local r = char:FindFirstChild("HumanoidRootPart")
+		if r then pcall(function() r.Anchored = false end) end
 	end
 	pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Custom end)
 end
@@ -8486,6 +8488,7 @@ addcmd('fly2',{'tweenfly','tfly'},function(args, speaker)
 	local hum = char:FindFirstChildWhichIsA("Humanoid")
 	FLYING = true
 	if hum then hum.PlatformStand = true end
+	pcall(function() root.Anchored = true end)
 	pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Track end)
 	local ctrl = {F = 0, B = 0, L = 0, R = 0, U = 0, D = 0}
 	local function setKey(k, v)
@@ -8508,18 +8511,24 @@ addcmd('fly2',{'tweenfly','tfly'},function(args, speaker)
 		if not FLYING then return end
 		root = getRoot(speaker.Character)
 		if not root then return end
+		if not root.Anchored then pcall(function() root.Anchored = true end) end
 		local curHum = speaker.Character and speaker.Character:FindFirstChildWhichIsA("Humanoid")
 		if curHum and not curHum.PlatformStand then curHum.PlatformStand = true end
-		pcall(function()
-			root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-			root.Velocity = Vector3.new(0, 0, 0)
-		end)
 		local cf = workspace.CurrentCamera.CFrame
-		local dir = cf.RightVector * (ctrl.R - ctrl.L) - cf.LookVector * (ctrl.F - ctrl.B) + Vector3.new(0, ctrl.U - ctrl.D, 0)
-		if dir.Magnitude < 0.05 then return end
-		local target = root.CFrame.p + dir.Unit * math.clamp(speed * 55 * dt, 0, 60)
+		local dir = cf.LookVector * (ctrl.F - ctrl.B) + cf.RightVector * (ctrl.R - ctrl.L) + Vector3.new(0, ctrl.U - ctrl.D, 0)
+		local pos = root.CFrame.p
+		if dir.Magnitude > 0.05 then
+			pos = pos + dir.Unit * math.clamp(speed * 55 * dt, 0, 60)
+		end
+		local flat = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
+		local targetCF
+		if flat.Magnitude > 0.05 then
+			targetCF = CFrame.lookAt(pos, pos + flat)
+		else
+			targetCF = CFrame.new(pos)
+		end
 		if tflyTween then pcall(function() tflyTween:Cancel() end) end
-		tflyTween = TweenService:Create(root, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {CFrame = CFrame.new(target)})
+		tflyTween = TweenService:Create(root, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {CFrame = targetCF})
 		tflyTween:Play()
 	end)
 end)
