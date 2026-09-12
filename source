@@ -376,15 +376,13 @@ function aexHover(btn)
 	if btn:GetAttribute("AEXHover") then return end
 	btn:SetAttribute("AEXHover", true)
 	btn.MouseEnter:Connect(function()
-		if btn.BackgroundTransparency == 0 then
-			btn:SetAttribute("AEXBaseColor", btn.BackgroundColor3)
-			local c = btn.BackgroundColor3
-			TweenService:Create(btn, AEX_TWEEN, {BackgroundColor3 = Color3.new(math.min(1, c.R + 0.10), math.min(1, c.G + 0.10), math.min(1, c.B + 0.10))}):Play()
-		end
+		btn:SetAttribute("AEXBaseColor", btn.BackgroundColor3)
+		local c = btn.BackgroundColor3
+		TweenService:Create(btn, AEX_TWEEN, {BackgroundColor3 = Color3.new(math.min(1, c.R + 0.10), math.min(1, c.G + 0.10), math.min(1, c.B + 0.10))}):Play()
 	end)
 	btn.MouseLeave:Connect(function()
 		local base = btn:GetAttribute("AEXBaseColor")
-		if base and btn.BackgroundTransparency == 0 then
+		if base then
 			TweenService:Create(btn, AEX_TWEEN, {BackgroundColor3 = base}):Play()
 		end
 	end)
@@ -470,28 +468,31 @@ end
 
 function applyThemeBackground()
 	if not bgImageFrame then
-		local ok = pcall(function()
+		local ok, err = pcall(function()
 			bgImageFrame = Instance.new("ImageLabel")
 			bgImageFrame.Name = randomString()
 			bgImageFrame.BackgroundTransparency = 1
 			bgImageFrame.BorderSizePixel = 0
 			bgImageFrame.ImageTransparency = 0
-			bgImageFrame.Position = UDim2.new(0, 0, 0, 20)
-			bgImageFrame.Size = UDim2.new(1, 0, 1, -20)
-			bgImageFrame.ZIndex = -5
-			bgImageFrame.Parent = Holder
+			bgImageFrame.Position = UDim2.new(0, 0, 0, 0)
+			bgImageFrame.Size = UDim2.new(1, 0, 1, 0)
+			bgImageFrame.ZIndex = 10
+			bgImageFrame.Parent = Dark
 			aexRound(bgImageFrame, 10, "bottom")
 			bgShadeFrame = Instance.new("Frame")
 			bgShadeFrame.Name = randomString()
 			bgShadeFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 			bgShadeFrame.BorderSizePixel = 0
-			bgShadeFrame.Position = UDim2.new(0, 0, 0, 20)
-			bgShadeFrame.Size = UDim2.new(1, 0, 1, -20)
-			bgShadeFrame.ZIndex = -4
-			bgShadeFrame.Parent = Holder
+			bgShadeFrame.Position = UDim2.new(0, 0, 0, 0)
+			bgShadeFrame.Size = UDim2.new(1, 0, 1, 0)
+			bgShadeFrame.ZIndex = 10
+			bgShadeFrame.Parent = Dark
 			aexRound(bgShadeFrame, 10, "bottom")
 		end)
-		if not ok then return end
+		if not ok then
+			pcall(function() notify("AEX", "bg init failed: " .. tostring(err)) end)
+			return
+		end
 	end
 	local bgOn = type(bgImage) == "string" and bgImage ~= ""
 	if not bgOn then
@@ -566,11 +567,11 @@ function applyThemeBackground()
 		end
 	end
 	pcall(function()
-		Dark.BackgroundTransparency = bgOn and 1 or 0
 		Example.BackgroundTransparency = bgOn and 0.4 or 0
 		for _, r in ipairs(CMDsF:GetChildren()) do
 			if r:IsA("TextButton") then
 				r.BackgroundTransparency = bgOn and 0.4 or 0
+				r:SetAttribute("AEXBaseBGTr", bgOn and 0.4 or 0)
 			end
 		end
 	end)
@@ -4165,34 +4166,69 @@ local function buildThemeStudio()
 		elseif rid then
 			bgImage = "rbxassetid://" .. rid
 		elseif t:match("^https?://") then
+			local orig = t
 			local fid = t:match("drive%.google%.com/file/d/([^/%?]+)")
 			if fid then t = "https://drive.google.com/thumbnail?id=" .. fid .. "&sz=w1000" end
 			if t:match("dropbox%.com") then t = t:gsub("dl=0", "dl=1") end
 			if t:match("discordapp%.com") then t = t:gsub("discordapp%.com", "discordapp.net") end
-			if t:match("discordapp%.net") then
-				if t:match("format=webp") then
-					t = t:gsub("format=webp", "format=png")
-				elseif not t:match("format=") then
-					t = t .. "&format=png"
+			local png = t
+			if png:match("discordapp%.net") then
+				if png:match("format=webp") then
+					png = png:gsub("format=webp", "format=png")
+				elseif not png:match("format=") then
+					png = png .. "&format=png"
 				end
-				t = t:gsub("quality=lossless", "quality=100")
+				png = png:gsub("quality=lossless", "")
+				png = png:gsub("&=&", "&")
+				png = png:gsub("%?&", "?")
+				png = png:gsub("&+$", "")
+			end
+			local cands = {}
+			local seen = {}
+			for _, c in ipairs({png, t, orig}) do
+				if c ~= "" and not seen[c] then
+					seen[c] = true
+					table.insert(cands, c)
+				end
 			end
 			if bgBusy then return end
 			bgBusy = true
 			urlBox.PlaceholderText = "downloading..."
 			task.spawn(function()
-				local ok, data = pcall(function()
-					if httprequest then
-						local res = httprequest({Url = t, Method = "GET"})
-						if type(res) == "table" then return res.Body end
-						return res
+				local function imageKind(b)
+					if type(b) ~= "string" or #b < 12 then return nil end
+					if b:sub(1, 4) == "\137PNG" then return "png" end
+					if b:sub(1, 3) == "\255\216\255" then return "jpg" end
+					if b:sub(1, 4) == "GIF8" then return "gif" end
+					if b:sub(1, 4) == "RIFF" and b:sub(9, 12) == "WEBP" then return "webp" end
+					if b:sub(1, 2) == "\066\077" then return "bmp" end
+					return nil
+				end
+				local got
+				for ci = 1, #cands do
+					local ok, data = pcall(function()
+						if httprequest then
+							local res = httprequest({Url = cands[ci], Method = "GET"})
+							if type(res) == "table" then return res.Body end
+							return res
+						end
+						return game:HttpGet(cands[ci])
+					end)
+					if ok then
+						local kind = imageKind(data)
+						if kind == "png" or kind == "jpg" or kind == "gif" or kind == "bmp" then
+							got = data
+							break
+						elseif kind == "webp" and not got then
+							got = data
+						end
 					end
-					return game:HttpGet(t)
-				end)
+					if ci < #cands then wait(0.15) end
+				end
 				local final
-				if ok and type(data) == "string" and #data > 0 then
+				if got then
 					local ok2, path = pcall(function()
-						writefile("AEX_bg.png", data)
+						writefile("AEX_bg.png", got)
 						return getcustomasset("AEX_bg.png")
 					end)
 					if ok2 and type(path) == "string" and path ~= "" then final = path end
@@ -4203,7 +4239,7 @@ local function buildThemeStudio()
 					bgImage = final
 					showBgResult()
 				else
-					notify("AEX", "Could not download the image. Use a direct png/jpg link.")
+					notify("AEX", "Could not download the image. Check that it is a direct link (png/jpg) and, for Discord, that the ?ex= link has not expired.")
 				end
 			end)
 			return
