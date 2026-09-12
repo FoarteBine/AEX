@@ -5822,6 +5822,7 @@ CMDs[#CMDs + 1] = {NAME = 'uuchat', DESC = 'Opens UUchat (external chat script)'
 CMDs[#CMDs + 1] = {NAME = 'alkekchat', DESC = 'Opens AlkekChat (external chat script)'}
 CMDs[#CMDs + 1] = {NAME = 'md', DESC = 'Opens Moldovan Admin (external admin script)'}
 CMDs[#CMDs + 1] = {NAME = 'bptc', DESC = 'Opens BPTC (external script)'}
+CMDs[#CMDs + 1] = {NAME = 'dexre', DESC = 'Opens Dex Recontinued explorer'}
 CMDs[#CMDs + 1] = {NAME = 'clearws / clearworkspace', DESC = 'Wipes Workspace & Lighting except players, camera and terrain'}
 CMDs[#CMDs + 1] = {NAME = 'heil', DESC = 'Gives the Heil tool: equip + click = frozen salute pose'}
 CMDs[#CMDs + 1] = {NAME = 'partname / partpath', DESC = 'Allows you to click a part to see its path & name'}
@@ -10164,6 +10165,13 @@ addcmd("bptc", {}, function(args, speaker)
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/Distendo/bptc/refs/heads/main/bptc.lua"))()
 	end)
 	if not ok then notify("BPTC", "Failed to load BPTC: " .. tostring(err)) end
+end)
+
+addcmd("dexre", {"dexrecontinued"}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://github.com/Tesker-103/DexRecontinued/releases/latest/download/out.lua"))()
+	end)
+	if not ok then notify("Dex Recontinued", "Failed to load Dex Recontinued: " .. tostring(err)) end
 end)
 
 addcmd("clearws", {"clearworkspace"}, function(args, speaker)
