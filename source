@@ -5690,7 +5690,7 @@ CMDs[#CMDs + 1] = {NAME = '', DESC = ''}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
-CMDs[#CMDs + 1] = {NAME = 'fly2 / tweenfly / tfly [speed]', DESC = 'Fly moved by TweenService (smooth, no physics forces)'}
+CMDs[#CMDs + 1] = {NAME = 'fly2 / tweenfly / tfly [speed]', DESC = 'Smooth tween fly: camera-follow, Shift boost, noclip in air'}
 CMDs[#CMDs + 1] = {NAME = 'unfly', DESC = 'Disables fly'}
 CMDs[#CMDs + 1] = {NAME = 'flyspeed [num]', DESC = 'Set fly speed (default is 20)'}
 CMDs[#CMDs + 1] = {NAME = 'vehiclefly / vfly [speed]', DESC = 'Makes you fly in a vehicle'}
@@ -8430,12 +8430,29 @@ local tweenFlyConn
 local tflyKeyDown
 local tflyKeyUp
 local tflyTween
+local tflyVel
+local tflyMoveDir
+local tflyOrient
+local tflyLastFlat
+local tflyParts
+local tflyPartsChar
 function stopTweenFly()
 	FLYING = false
 	if tweenFlyConn then tweenFlyConn:Disconnect(); tweenFlyConn = nil end
 	if tflyKeyDown then tflyKeyDown:Disconnect(); tflyKeyDown = nil end
 	if tflyKeyUp then tflyKeyUp:Disconnect(); tflyKeyUp = nil end
 	if tflyTween then pcall(function() tflyTween:Cancel() end); tflyTween = nil end
+	if tflyParts then
+		for _, p in ipairs(tflyParts) do
+			pcall(function() p.CanCollide = true end)
+		end
+	end
+	tflyParts = nil
+	tflyPartsChar = nil
+	tflyVel = nil
+	tflyMoveDir = nil
+	tflyOrient = nil
+	tflyLastFlat = nil
 	local char = Players.LocalPlayer.Character
 	if char then
 		local hum = char:FindFirstChildWhichIsA("Humanoid")
@@ -8491,6 +8508,16 @@ addcmd('fly2',{'tweenfly','tfly'},function(args, speaker)
 	if hum then hum.PlatformStand = true end
 	pcall(function() root.Anchored = true end)
 	pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Track end)
+	-- Jeko-style smoothed logic
+	local MAX_SPEED = 85 * speed
+	local ACCEL = 0.04
+	local DECEL = 0.02
+	local TURN = 0.03
+	local ROT = 0.05
+	tflyVel = Vector3.new(0, 0, 0)
+	tflyMoveDir = Vector3.new(0, 0, 0)
+	tflyOrient = workspace.CurrentCamera.CFrame
+	tflyLastFlat = Vector3.new(tflyOrient.LookVector.X, 0, tflyOrient.LookVector.Z)
 	local ctrl = {F = 0, B = 0, L = 0, R = 0, U = 0, D = 0}
 	local function setKey(k, v)
 		if k == Enum.KeyCode.W then ctrl.F = v
@@ -8513,21 +8540,42 @@ addcmd('fly2',{'tweenfly','tfly'},function(args, speaker)
 		root = getRoot(speaker.Character)
 		if not root then return end
 		if not root.Anchored then pcall(function() root.Anchored = true end) end
-		local curHum = speaker.Character and speaker.Character:FindFirstChildWhichIsA("Humanoid")
+		local curChar = speaker.Character
+		if tflyPartsChar ~= curChar then
+			tflyPartsChar = curChar
+			tflyParts = {}
+			for _, p in curChar:GetDescendants() do
+				if p:IsA("BasePart") then tflyParts[#tflyParts + 1] = p end
+			end
+		end
+		for _, p in ipairs(tflyParts) do
+			if p.CanCollide then p.CanCollide = false end
+		end
+		local curHum = curChar and curChar:FindFirstChildWhichIsA("Humanoid")
 		if curHum and not curHum.PlatformStand then curHum.PlatformStand = true end
-		local cf = workspace.CurrentCamera.CFrame
-		local dir = cf.LookVector * (ctrl.F - ctrl.B) + cf.RightVector * (ctrl.R - ctrl.L) + Vector3.new(0, ctrl.U - ctrl.D, 0)
-		local pos = root.CFrame.p
-		if dir.Magnitude > 0.05 then
-			pos = pos + dir.Unit * math.clamp(speed * 55 * dt, 0, 60)
-		end
-		local flat = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
-		local targetCF
-		if flat.Magnitude > 0.05 then
-			targetCF = CFrame.lookAt(pos, pos + flat)
+		local camCF = workspace.CurrentCamera.CFrame
+		tflyOrient = tflyOrient:Lerp(camCF, ROT)
+		local lv = tflyOrient.LookVector
+		local rv = tflyOrient.RightVector
+		local targetDir = Vector3.new(0, 0, 0)
+		if ctrl.F > 0 then targetDir = targetDir + lv end
+		if ctrl.B > 0 then targetDir = targetDir - lv end
+		if ctrl.L > 0 then targetDir = targetDir - rv end
+		if ctrl.R > 0 then targetDir = targetDir + rv end
+		if ctrl.U > 0 then targetDir = targetDir + Vector3.new(0, 1, 0) end
+		if ctrl.D > 0 then targetDir = targetDir - Vector3.new(0, 1, 0) end
+		tflyMoveDir = tflyMoveDir:Lerp(targetDir, TURN)
+		local boost = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and 2.5 or 1
+		local targetVel = tflyMoveDir * (MAX_SPEED * boost)
+		if targetDir.Magnitude > 0 then
+			tflyVel = tflyVel:Lerp(targetVel, ACCEL)
 		else
-			targetCF = CFrame.new(pos)
+			tflyVel = tflyVel:Lerp(Vector3.new(0, 0, 0), DECEL)
 		end
+		local pos = root.CFrame.p + tflyVel * dt
+		local flat = Vector3.new(lv.X, 0, lv.Z)
+		if flat.Magnitude > 0.05 then tflyLastFlat = flat end
+		local targetCF = CFrame.lookAt(pos, pos + tflyLastFlat)
 		if tflyTween then pcall(function() tflyTween:Cancel() end) end
 		tflyTween = TweenService:Create(root, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {CFrame = targetCF})
 		tflyTween:Play()
