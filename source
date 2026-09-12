@@ -467,6 +467,114 @@ function applyThemeFont()
 		end
 	end
 end
+
+function applyThemeBackground()
+	if not bgImageFrame then
+		local ok = pcall(function()
+			bgImageFrame = Instance.new("ImageLabel")
+			bgImageFrame.Name = randomString()
+			bgImageFrame.BackgroundTransparency = 1
+			bgImageFrame.BorderSizePixel = 0
+			bgImageFrame.ImageTransparency = 0
+			bgImageFrame.Position = UDim2.new(0, 0, 0, 20)
+			bgImageFrame.Size = UDim2.new(1, 0, 1, -20)
+			bgImageFrame.ZIndex = -5
+			bgImageFrame.Parent = Holder
+			aexRound(bgImageFrame, 10, "bottom")
+			bgShadeFrame = Instance.new("Frame")
+			bgShadeFrame.Name = randomString()
+			bgShadeFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+			bgShadeFrame.BorderSizePixel = 0
+			bgShadeFrame.Position = UDim2.new(0, 0, 0, 20)
+			bgShadeFrame.Size = UDim2.new(1, 0, 1, -20)
+			bgShadeFrame.ZIndex = -4
+			bgShadeFrame.Parent = Holder
+			aexRound(bgShadeFrame, 10, "bottom")
+		end)
+		if not ok then return end
+	end
+	local bgOn = type(bgImage) == "string" and bgImage ~= ""
+	if not bgOn then
+		bgImageFrame.Visible = false
+		bgShadeFrame.Visible = false
+	else
+		bgImageFrame.Visible = true
+		bgShadeFrame.Visible = true
+		bgShadeFrame.BackgroundTransparency = 1 - math.clamp(bgDark or 0, 0, 95) / 100
+		if bgFit == "Fill" then bgFit = "Crop" end
+		local st
+		pcall(function() st = Enum.ScaleType[bgFit] end)
+		if st then bgImageFrame.ScaleType = st end
+		local useBlur = (bgBlur or 0) > 0
+		local fallback = function()
+			pcall(function() bgImageFrame.Image = bgImage end)
+			pcall(function() bgImageFrame.ImageContent = nil end)
+		end
+		if not useBlur then
+			bgRenderedKey = ""
+			fallback()
+		else
+			local key = bgImage .. "|" .. tostring(bgBlur)
+			if key == bgRenderedKey then
+				-- already baked, nothing to redo
+			else
+				local blurOK = false
+				local src, dst
+				blurOK = pcall(function()
+					bgImageFrame.Image = bgImage
+					pcall(function() ContentProvider:PreloadAsync({bgImageFrame}) end)
+					local fw = math.clamp(bgImageFrame.AbsoluteSize.X, 64, 512)
+					local fh = math.clamp(bgImageFrame.AbsoluteSize.Y, 64, 512)
+					src = Instance.new("EditableImage")
+					src.Name = randomString()
+					src.Size = Vector2.new(math.floor(fw), math.floor(fh))
+					src.Parent = ScaledHolder
+					dst = Instance.new("EditableImage")
+					dst.Name = randomString()
+					dst.Size = src.Size
+					dst.Parent = ScaledHolder
+					local draw = Instance.new("DrawImage")
+					draw.Name = randomString()
+					draw.Image = bgImage
+					draw.Target = src
+					if not draw:Run() then error("draw") end
+					draw:Destroy()
+					local blur = Instance.new("BlurImage")
+					blur.Name = randomString()
+					blur.Source = src
+					blur.Target = dst
+					blur.BlurRadius = math.clamp(bgBlur, 1, 24)
+					if not blur:Run() then error("blur") end
+					blur:Destroy()
+					src:Destroy()
+					local old = bgEditableOut
+					bgImageFrame.ImageContent = dst
+					bgEditableOut = dst
+					if old then pcall(function() old:Destroy() end) end
+				end)
+				if blurOK then
+					bgRenderedKey = key
+				else
+					pcall(function()
+						if src then src:Destroy() end
+						if dst then dst:Destroy() end
+					end)
+					bgRenderedKey = ""
+					fallback()
+				end
+			end
+		end
+	end
+	pcall(function()
+		Dark.BackgroundTransparency = bgOn and 1 or 0
+		Example.BackgroundTransparency = bgOn and 0.4 or 0
+		for _, r in ipairs(CMDsF:GetChildren()) do
+			if r:IsA("TextButton") then
+				r.BackgroundTransparency = bgOn and 0.4 or 0
+			end
+		end
+	end)
+end
 -- // ======== AEX Modern UI helpers ========
 
 ScaledHolder.Name = randomString()
@@ -3084,6 +3192,10 @@ currentScroll = Color3.fromRGB(86, 92, 110)
 cornerRadius = 10
 uiFont = "Gotham"
 textSize = 14
+bgImage = ""
+bgFit = "Crop"
+bgDark = 40
+bgBlur = 0
 
 defaultGuiScale = IsOnMobile and 0.9 or 1
 defaultsettings = {
@@ -3107,6 +3219,10 @@ defaultsettings = {
 	cornerRadius = 10;
 	uiFont = "Gotham";
 	textSize = 14;
+	bgImage = "";
+	bgFit = "Crop";
+	bgDark = 40;
+	bgBlur = 0;
 	eventBinds = eventEditor.SaveData()
 }
 
@@ -3128,6 +3244,10 @@ useFactorySettings = function()
 	cornerRadius = 10
 	uiFont = "Gotham"
 	textSize = 14
+	bgImage = ""
+	bgFit = "Crop"
+	bgDark = 40
+	bgBlur = 0
 end
 
 function createPopup(title, text)
@@ -3248,6 +3368,10 @@ function saves()
 					if vtype(json.cornerRadius, "number") then cornerRadius = math.clamp(math.floor(json.cornerRadius), 0, 20) else cornerRadius = 10 end
 					if vtype(json.uiFont, "string") then uiFont = json.uiFont else uiFont = "Gotham" end
 					if vtype(json.textSize, "number") then textSize = math.clamp(math.floor(json.textSize), 12, 18) else textSize = 14 end
+					if vtype(json.bgImage, "string") then bgImage = json.bgImage else bgImage = "" end
+					if vtype(json.bgFit, "string") then bgFit = json.bgFit else bgFit = "Crop" end
+					if vtype(json.bgDark, "number") then bgDark = math.clamp(math.floor(json.bgDark), 0, 95) else bgDark = 40 end
+					if vtype(json.bgBlur, "number") then bgBlur = math.clamp(math.floor(json.bgBlur), 0, 24) else bgBlur = 0 end
 					if vtype(json.eventBinds, "string") then loadedEventData = json.eventBinds end
 				end)
 				if not success then
@@ -3320,6 +3444,10 @@ function updatesaves()
 			cornerRadius = cornerRadius or 10;
 			uiFont = uiFont or "Gotham";
 			textSize = textSize or 14;
+			bgImage = bgImage or "";
+			bgFit = bgFit or "Crop";
+			bgDark = bgDark or 40;
+			bgBlur = bgBlur or 0;
 			eventBinds = eventEditor.SaveData()
 		}
 		writefileCooldown("AEX_FE.aex", HttpService:JSONEncode(update))
@@ -3631,7 +3759,7 @@ local studioRefs = {shade1 = {}, shade2 = {}, shade3 = {}, text1 = {}}
 local themeStudio
 local picker
 local Npicker
-local radiusSlider, sizeSlider, fontSync
+local radiusSlider, sizeSlider, fontSync, dimSlider, blurSlider, bgSync
 local openRolePicker
 local ensurePicker
 
@@ -3778,8 +3906,8 @@ local function buildThemeStudio()
 	if themeStudio then return end
 	themeStudio = Instance.new("Frame")
 	themeStudio.Name = randomString()
-	themeStudio.Size = UDim2.new(0, 300, 0, 282)
-	themeStudio.Position = UDim2.new(0.5, -150, 0, -400)
+	themeStudio.Size = UDim2.new(0, 300, 0, 490)
+	themeStudio.Position = UDim2.new(0.5, -150, 0, -560)
 	themeStudio.BackgroundTransparency = 1
 	themeStudio.Active = true
 	themeStudio.Parent = ScaledHolder
@@ -3828,7 +3956,7 @@ local function buildThemeStudio()
 	table.insert(studioRefs.text1, studioExit)
 	studioExit.MouseButton1Click:Connect(function()
 		themeStudioOpen = false
-		themeStudio:TweenPosition(UDim2.new(0.5, -150, 0, -400), "InOut", "Quart", 0.35, true, nil)
+		themeStudio:TweenPosition(UDim2.new(0.5, -150, 0, -560), "InOut", "Quart", 0.35, true, nil)
 	end)
 
 	local body = Instance.new("Frame")
@@ -3976,9 +4104,216 @@ local function buildThemeStudio()
 		function() updatesaves() end
 	)
 
+	makeSection(body, 218, "BACKGROUND")
+
+	local urlBox = Instance.new("TextBox")
+	urlBox.Name = randomString()
+	urlBox.Position = UDim2.new(0, 10, 0, 234)
+	urlBox.Size = UDim2.new(1, -62, 0, 22)
+	urlBox.BackgroundColor3 = currentShade3
+	urlBox.BorderSizePixel = 0
+	urlBox.ClearTextOnFocus = false
+	urlBox.Font = Enum.Font.Gotham
+	urlBox.PlaceholderText = "rbxassetid://... or http image url"
+	urlBox.PlaceholderColor3 = Color3.fromRGB(145, 150, 165)
+	urlBox.Text = ""
+	urlBox.TextColor3 = currentText1
+	urlBox.TextSize = 12
+	urlBox.TextTruncate = Enum.TextTruncate.AtEnd
+	urlBox.TextXAlignment = Enum.TextXAlignment.Left
+	urlBox.Parent = body
+	aexRound(urlBox, 5)
+	aexStroke(urlBox, 0.5)
+	table.insert(studioRefs.shade3, urlBox)
+	table.insert(studioRefs.text1, urlBox)
+
+	local bgBusy = false
+	local function showBgResult()
+		applyThemeBackground()
+		updatesaves()
+		urlBox.Text = bgImage
+		Settings:TweenPosition(UDim2.new(0, 0, 0, 220), "InOut", "Quart", 0.35, true, nil)
+		task.spawn(function()
+			if type(bgImage) ~= "string" or bgImage == "" or not bgImageFrame then return end
+			local hadError = false
+			pcall(function()
+				ContentProvider:PreloadAsync({bgImageFrame}, function(_, st)
+					if st == Enum.ContentStatus.Error then hadError = true end
+				end)
+			end)
+			if hadError then
+				notify("AEX", "Image failed to render. Use a direct link (png/jpg/webp) or rbxassetid.")
+			end
+		end)
+	end
+	local function applyBgUrl()
+		local t = (urlBox.Text or ""):gsub("^%s*(.-)%s*$", "%1")
+		if t == "" then
+			bgImage = ""
+			applyThemeBackground()
+			updatesaves()
+			Settings:TweenPosition(UDim2.new(0, 0, 0, 220), "InOut", "Quart", 0.35, true, nil)
+			return
+		end
+		local rid = t:match("roblox%.com/library/(%d+)") or (t:match("roblox") and t:match("id=(%d+)"))
+		if t:match("^rbx") then
+			bgImage = t
+		elseif t:match("^%d+$") then
+			bgImage = "rbxassetid://" .. t
+		elseif rid then
+			bgImage = "rbxassetid://" .. rid
+		elseif t:match("^https?://") then
+			local fid = t:match("drive%.google%.com/file/d/([^/%?]+)")
+			if fid then t = "https://drive.google.com/thumbnail?id=" .. fid .. "&sz=w1000" end
+			if t:match("dropbox%.com") then t = t:gsub("dl=0", "dl=1") end
+			if bgBusy then return end
+			bgBusy = true
+			urlBox.PlaceholderText = "downloading..."
+			task.spawn(function()
+				local ok, data = pcall(function()
+					if httprequest then
+						local res = httprequest({Url = t, Method = "GET"})
+						if type(res) == "table" then return res.Body end
+						return res
+					end
+					return game:HttpGet(t)
+				end)
+				local final
+				if ok and type(data) == "string" and #data > 0 then
+					local ok2, path = pcall(function()
+						writefile("AEX_bg.png", data)
+						return getcustomasset("AEX_bg.png")
+					end)
+					if ok2 and type(path) == "string" and path ~= "" then final = path end
+				end
+				bgBusy = false
+				urlBox.PlaceholderText = "rbxassetid://... or http image url"
+				if final then
+					bgImage = final
+					showBgResult()
+				else
+					notify("AEX", "Could not download the image. Use a direct png/jpg link.")
+				end
+			end)
+			return
+		else
+			notify("AEX", "Invalid image source.")
+			return
+		end
+		showBgResult()
+	end
+
+	local setBtn = Instance.new("TextButton")
+	setBtn.Name = randomString()
+	setBtn.Position = UDim2.new(1, -50, 0, 234)
+	setBtn.Size = UDim2.new(0, 40, 0, 22)
+	setBtn.BackgroundColor3 = AEX_ACCENT
+	setBtn.BorderSizePixel = 0
+	setBtn.Font = Enum.Font.GothamBold
+	setBtn.Text = "Set"
+	setBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	setBtn.TextSize = 12
+	setBtn.AutoButtonColor = false
+	setBtn.Parent = body
+	aexRound(setBtn, 5)
+	aexHover(setBtn)
+	setBtn.MouseButton1Click:Connect(applyBgUrl)
+	urlBox.FocusLost:Connect(function(enterPressed)
+		if enterPressed then applyBgUrl() end
+	end)
+
+	makeSection(body, 262, "FILL MODE")
+
+	local modePrev = Instance.new("TextButton")
+	modePrev.Name = randomString()
+	modePrev.Position = UDim2.new(0, 10, 0, 278)
+	modePrev.Size = UDim2.new(0, 24, 0, 22)
+	modePrev.BackgroundColor3 = currentShade3
+	modePrev.BorderSizePixel = 0
+	modePrev.Font = Enum.Font.GothamBold
+	modePrev.Text = "<"
+	modePrev.TextSize = 13
+	modePrev.TextColor3 = currentText1
+	modePrev.AutoButtonColor = false
+	modePrev.Parent = body
+	aexRound(modePrev, 5)
+	aexHover(modePrev)
+	table.insert(studioRefs.shade3, modePrev)
+	table.insert(studioRefs.text1, modePrev)
+
+	local modeNext = Instance.new("TextButton")
+	modeNext.Name = randomString()
+	modeNext.Position = UDim2.new(1, -34, 0, 278)
+	modeNext.Size = UDim2.new(0, 24, 0, 22)
+	modeNext.BackgroundColor3 = currentShade3
+	modeNext.BorderSizePixel = 0
+	modeNext.Font = Enum.Font.GothamBold
+	modeNext.Text = ">"
+	modeNext.TextSize = 13
+	modeNext.TextColor3 = currentText1
+	modeNext.AutoButtonColor = false
+	modeNext.Parent = body
+	aexRound(modeNext, 5)
+	aexHover(modeNext)
+	table.insert(studioRefs.shade3, modeNext)
+	table.insert(studioRefs.text1, modeNext)
+
+	local modeLabel = Instance.new("TextLabel")
+	modeLabel.Name = randomString()
+	modeLabel.Position = UDim2.new(0, 40, 0, 278)
+	modeLabel.Size = UDim2.new(1, -80, 0, 22)
+	modeLabel.BackgroundColor3 = currentShade2
+	modeLabel.BorderSizePixel = 0
+	modeLabel.Font = Enum.Font.Gotham
+	modeLabel.TextSize = 13
+	modeLabel.TextColor3 = currentText1
+	modeLabel.Text = bgFit
+	modeLabel.Parent = body
+	aexRound(modeLabel, 5)
+	aexStroke(modeLabel, 0.5)
+	table.insert(studioRefs.shade2, modeLabel)
+	table.insert(studioRefs.text1, modeLabel)
+
+	local MODE_LIST = {"Crop", "Fit", "Stretch", "Tile"}
+	local function stepMode(dir)
+		local idx = table.find(MODE_LIST, bgFit) or 1
+		idx = idx + dir
+		if idx < 1 then idx = #MODE_LIST elseif idx > #MODE_LIST then idx = 1 end
+		bgFit = MODE_LIST[idx]
+		modeLabel.Text = bgFit
+		applyThemeBackground()
+		wait()
+		updatesaves()
+	end
+	modePrev.MouseButton1Click:Connect(function() stepMode(-1) end)
+	modeNext.MouseButton1Click:Connect(function() stepMode(1) end)
+
+	makeSection(body, 310, "DIM")
+	dimSlider = makeSlider(body, 326, 0, 95,
+		function() return bgDark end,
+		function(v) bgDark = v applyThemeBackground() end,
+		function() updatesaves() end,
+		function(v) return v .. "%" end
+	)
+
+	makeSection(body, 354, "IMAGE BLUR")
+	blurSlider = makeSlider(body, 370, 0, 24,
+		function() return bgBlur end,
+		function(v) bgBlur = v end,
+		function() applyThemeBackground() updatesaves() end,
+		function(v) return v .. "px" end
+	)
+
+	bgSync = function()
+		urlBox.Text = bgImage or ""
+		modeLabel.Text = bgFit
+		dimSlider.sync()
+		blurSlider.sync()
+	end
+
 	local resetBtn = Instance.new("TextButton")
 	resetBtn.Name = randomString()
-	resetBtn.Position = UDim2.new(0, 10, 0, 226)
+	resetBtn.Position = UDim2.new(0, 10, 0, 428)
 	resetBtn.Size = UDim2.new(1, -20, 0, 26)
 	resetBtn.BackgroundColor3 = currentShade3
 	resetBtn.BorderSizePixel = 0
@@ -3997,6 +4332,10 @@ local function buildThemeStudio()
 		cornerRadius = 10
 		uiFont = "Gotham"
 		textSize = 14
+		bgImage = ""
+		bgFit = "Crop"
+		bgDark = 40
+		bgBlur = 0
 		updateColors(Color3.fromRGB(23, 25, 31), shade1)
 		updateColors(Color3.fromRGB(32, 35, 43), shade2)
 		updateColors(Color3.fromRGB(48, 52, 63), shade3)
@@ -4005,15 +4344,18 @@ local function buildThemeStudio()
 		updateColors(Color3.fromRGB(86, 92, 110), scroll)
 		applyThemeRadius()
 		applyThemeFont()
+		applyThemeBackground()
 		fontSync()
 		radiusSlider.sync()
 		sizeSlider.sync()
+		bgSync()
 		wait()
 		updatesaves()
 	end)
 
 	dragGUI(themeStudio)
 	applyThemeFont()
+	bgSync()
 end
 
 local function stylePickerAsset()
@@ -4174,14 +4516,15 @@ ColorsButton.MouseButton1Click:Connect(function()
 		radiusSlider.sync()
 		sizeSlider.sync()
 		fontSync()
+		bgSync()
 		if colorpickerOpen and picker then
 			picker:TweenPosition(UDim2.new(0.5, -219, 0, -500), "InOut", "Quart", 0.35, true, nil)
 		end
 		themeStudio.Visible = true
-		themeStudio:TweenPosition(UDim2.new(0.5, -150, 0, 100), "InOut", "Quart", 0.35, true, nil)
+		themeStudio:TweenPosition(UDim2.new(0.5, -150, 0, 60), "InOut", "Quart", 0.35, true, nil)
 	else
 		themeStudioOpen = false
-		themeStudio:TweenPosition(UDim2.new(0.5, -150, 0, -400), "InOut", "Quart", 0.35, true, nil)
+		themeStudio:TweenPosition(UDim2.new(0.5, -150, 0, -560), "InOut", "Quart", 0.35, true, nil)
 	end
 end)
 
@@ -9594,6 +9937,13 @@ addcmd("f3x", {"fex"}, function(args, speaker)
 	loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/refs/heads/main/f3x.lua"))()
 end)
 
+addcmd("vex", {"vexexplorer", "vexplorer"}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/Vezise/2026/main/Vez/VexExplorer/VEXExplorer.lua"))()
+	end)
+	if not ok then notify("Vex", "Failed to load VexExplorer: " .. tostring(err)) end
+end)
+
 addcmd("partpath", {"partname"}, function(args, speaker)
 	selectPart()
 end)
@@ -13996,6 +14346,7 @@ end
 
 applyThemeRadius()
 applyThemeFont()
+applyThemeBackground()
 
 if PluginsTable ~= nil or PluginsTable ~= {} then
 	FindPlugins(PluginsTable)
