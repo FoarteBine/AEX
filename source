@@ -4140,7 +4140,7 @@ local function buildThemeStudio()
 				ContentProvider:PreloadAsync({bgImageFrame}, function(_, st)
 					local nm
 					pcall(function() nm = st.Name end)
-					if nm == "Error" then hadError = true end
+					if nm == "Error" or nm == "NotFound" then hadError = true end
 				end)
 			end)
 			if hadError then
@@ -4168,6 +4168,15 @@ local function buildThemeStudio()
 			local fid = t:match("drive%.google%.com/file/d/([^/%?]+)")
 			if fid then t = "https://drive.google.com/thumbnail?id=" .. fid .. "&sz=w1000" end
 			if t:match("dropbox%.com") then t = t:gsub("dl=0", "dl=1") end
+			if t:match("discordapp%.com") then t = t:gsub("discordapp%.com", "discordapp.net") end
+			if t:match("discordapp%.net") then
+				if t:match("format=webp") then
+					t = t:gsub("format=webp", "format=png")
+				elseif not t:match("format=") then
+					t = t .. "&format=png"
+				end
+				t = t:gsub("quality=lossless", "quality=100")
+			end
 			if bgBusy then return end
 			bgBusy = true
 			urlBox.PlaceholderText = "downloading..."
@@ -5771,7 +5780,7 @@ CMDs[#CMDs + 1] = {NAME = 'lookat [player]', DESC = 'Moves your camera view to a
 CMDs[#CMDs + 1] = {NAME = '', DESC = ''}
 CMDs[#CMDs + 1] = {NAME = 'btools (CLIENT)', DESC = 'Gives you building tools (DOES NOT REPLICATE)'}
 CMDs[#CMDs + 1] = {NAME = 'f3x (CLIENT)', DESC = 'Gives you F3X building tools (DOES NOT REPLICATE)'}
-CMDs[#CMDs + 1] = {NAME = 'vex (CLIENT)', DESC = 'Opens the Vex Explorer (external explorer script)'}
+CMDs[#CMDs + 1] = {NAME = 'vex', DESC = 'Opens the Vex Explorer (external explorer script)'}
 CMDs[#CMDs + 1] = {NAME = 'partname / partpath', DESC = 'Allows you to click a part to see its path & name'}
 CMDs[#CMDs + 1] = {NAME = 'delete [instance name] (CLIENT)', DESC = 'Removes any part with a certain name from the workspace (DOES NOT REPLICATE)'}
 CMDs[#CMDs + 1] = {NAME = 'deleteclass / dc [class name] (CLIENT)', DESC = 'Removes any part with a certain classname from the workspace (DOES NOT REPLICATE)'}
