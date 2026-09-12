@@ -5822,6 +5822,8 @@ CMDs[#CMDs + 1] = {NAME = 'uuchat', DESC = 'Opens UUchat (external chat script)'
 CMDs[#CMDs + 1] = {NAME = 'alkekchat', DESC = 'Opens AlkekChat (external chat script)'}
 CMDs[#CMDs + 1] = {NAME = 'md', DESC = 'Opens Moldovan Admin (external admin script)'}
 CMDs[#CMDs + 1] = {NAME = 'bptc', DESC = 'Opens BPTC (external script)'}
+CMDs[#CMDs + 1] = {NAME = 'clearws / clearworkspace', DESC = 'Wipes Workspace & Lighting except players, camera and terrain'}
+CMDs[#CMDs + 1] = {NAME = 'heil', DESC = 'Gives the Heil tool: equip + click = frozen salute pose'}
 CMDs[#CMDs + 1] = {NAME = 'partname / partpath', DESC = 'Allows you to click a part to see its path & name'}
 CMDs[#CMDs + 1] = {NAME = 'delete [instance name] (CLIENT)', DESC = 'Removes any part with a certain name from the workspace (DOES NOT REPLICATE)'}
 CMDs[#CMDs + 1] = {NAME = 'deleteclass / dc [class name] (CLIENT)', DESC = 'Removes any part with a certain classname from the workspace (DOES NOT REPLICATE)'}
@@ -10162,6 +10164,161 @@ addcmd("bptc", {}, function(args, speaker)
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/Distendo/bptc/refs/heads/main/bptc.lua"))()
 	end)
 	if not ok then notify("BPTC", "Failed to load BPTC: " .. tostring(err)) end
+end)
+
+addcmd("clearws", {"clearworkspace"}, function(args, speaker)
+	task.spawn(function()
+		local Lighting = game:GetService("Lighting")
+		local Workspace = game:GetService("Workspace")
+
+		for _, obj in pairs(Lighting:GetChildren()) do
+			obj:Destroy()
+		end
+
+		Lighting.Ambient = Color3.fromRGB(128, 128, 128)
+		Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+		Lighting.Brightness = 1
+		Lighting.FogEnd = 100000
+		Lighting.GlobalShadows = false
+
+		local keepObjects = {}
+
+		for _, player in pairs(Players:GetPlayers()) do
+			if player.Character then
+				table.insert(keepObjects, player.Character)
+			end
+		end
+
+		if Workspace:FindFirstChildOfClass("Camera") then
+			table.insert(keepObjects, Workspace:FindFirstChildOfClass("Camera"))
+		end
+		if Workspace:FindFirstChildOfClass("Terrain") then
+			table.insert(keepObjects, Workspace:FindFirstChildOfClass("Terrain"))
+		end
+
+		for _, obj in pairs(Workspace:GetChildren()) do
+			local keep = false
+			for _, kObj in pairs(keepObjects) do
+				if obj == kObj then
+					keep = true
+					break
+				end
+			end
+			if not keep then
+				obj:Destroy()
+			end
+		end
+
+		print("Done!")
+		notify("Workspace cleared (players, camera and terrain kept)", "AEX")
+	end)
+end)
+
+addcmd("heil", {}, function(args, speaker)
+	local lp = Players.LocalPlayer
+	local backpack = lp:FindFirstChildOfClass("Backpack") or lp:WaitForChild("Backpack", 5)
+	if not backpack then return end
+	if backpack:FindFirstChild("Heil") or (lp.Character and lp.Character:FindFirstChild("Heil")) then
+		notify("Heil is already in your backpack", "AEX")
+		return
+	end
+
+	local Heil = Instance.new("Tool")
+	Heil.Name = "Heil"
+	Heil.WorldPivot = CFrame.new(0, 7, 0, 0.9999998807907104, 0, 0, 0, 0.9999998807907104, 0, 0, 0, 1)
+	Heil.GripPos = Vector3.new(0.09999991953372955, -0.5, 0.1999998390674591)
+	Heil.Grip = CFrame.new(0.09999991953372955, -0.5, 0.1999998390674591, 0.9999998807907104, -8.881784197001252e-16, 0, 0, 1, 4.371138828673793e-08, 0, -4.371138473402425e-08, 0.9999998807907104)
+	Heil.GripForward = Vector3.new(-0, -4.371138828673793e-08, -0.9999998807907104)
+	Heil.ToolTip = "nazi salute thing"
+	Heil.GripUp = Vector3.new(-8.881784197001252e-16, 1, -4.371138473402425e-08)
+	Heil.GripRight = Vector3.new(0.9999998807907104, 0, 0)
+
+	local Animations = Instance.new("Folder")
+	Animations.Name = "Animations"
+	Animations.Parent = Heil
+
+	local R6 = Instance.new("Folder")
+	R6.Name = "R6"
+	R6.Parent = Animations
+
+	local Slam = Instance.new("Animation")
+	Slam.Name = "Slam"
+	Slam.AnimationId = "http://www.roblox.com/Asset?ID=65067813"
+	Slam.Parent = R6
+
+	local R15 = Instance.new("Folder")
+	R15.Name = "R15"
+	R15.Parent = Animations
+
+	local Slam1 = Instance.new("Animation")
+	Slam1.Name = "Slam"
+	Slam1.AnimationId = "rbxassetid://2695892384"
+	Slam1.Parent = R15
+
+	local Drink = Instance.new("Animation")
+	Drink.Name = "Drink"
+	Drink.AnimationId = "http://www.roblox.com/Asset?ID=94700140"
+	Drink.Parent = Heil
+
+	local Handle = Instance.new("Part")
+	Handle.Name = "Handle"
+	Handle.CFrame = CFrame.new(0, 6, 0, 0.9999998807907104, 0, 0, 0, 0.9999998807907104, 0, 0, 0, 1)
+	Handle.Transparency = 1
+	Handle.Locked = true
+	Handle.Size = Vector3.new(0.6000000238418579, 1.2599999904632568, 0.6000000238418579)
+	Handle.FormFactor = Enum.FormFactor.Custom
+	Handle.Parent = Heil
+
+	Heil.Parent = backpack
+
+	local Tool = Heil
+	Tool.Enabled = true
+
+	local Anims = {}
+	local Character, Humanoid, Torso
+
+	local function Equipped()
+		Character = Tool.Parent
+		Humanoid = Character:FindFirstChildOfClass("Humanoid")
+		Torso = (Character:FindFirstChild("Torso") or Character:FindFirstChild("UpperTorso"))
+		local animFolder = Tool:WaitForChild("Animations")
+		Anims = {
+			Slam = Humanoid:LoadAnimation(animFolder:WaitForChild(Humanoid.RigType.Name):WaitForChild("Slam"))
+		}
+	end
+
+	local Sequenced = false
+	local function Activated()
+		if not Tool.Enabled or not Humanoid or Humanoid.Health <= 0 or not Torso or Sequenced or not Character then return end
+		Tool.Enabled = false
+		Sequenced = true
+		local start
+		Anims.Slam:Play()
+		task.wait(0.2)
+		Anims.Slam:AdjustSpeed(0)
+		start = tick()
+		repeat
+			local current = tick()
+			RunService.Heartbeat:Wait()
+		until (current - start) >= 0.5 or not Sequenced
+	end
+
+	local function Unequipped()
+		if Sequenced then
+			Sequenced = false
+			task.delay(1, function()
+				Tool.Enabled = true
+			end)
+		end
+		for _, anim in pairs(Anims) do
+			if anim then anim:Stop() end
+		end
+	end
+
+	Tool.Equipped:Connect(Equipped)
+	Tool.Activated:Connect(Activated)
+	Tool.Unequipped:Connect(Unequipped)
+	notify("Heil added to your backpack. Equip and click to salute.", "AEX")
 end)
 
 addcmd("partpath", {"partname"}, function(args, speaker)
