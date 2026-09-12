@@ -8554,7 +8554,12 @@ addcmd('fly2',{'tweenfly','tfly'},function(args, speaker)
 		local curHum = curChar and curChar:FindFirstChildWhichIsA("Humanoid")
 		if curHum and not curHum.PlatformStand then curHum.PlatformStand = true end
 		local camCF = workspace.CurrentCamera.CFrame
-		tflyOrient = tflyOrient:Lerp(camCF, ROT)
+		-- frame-rate independent smoothing (constants are per 1/60s frame)
+		local kRot = 1 - (1 - ROT) ^ (dt * 60)
+		local kTurn = 1 - (1 - TURN) ^ (dt * 60)
+		local kAcc = 1 - (1 - ACCEL) ^ (dt * 60)
+		local kDec = 1 - (1 - DECEL) ^ (dt * 60)
+		tflyOrient = tflyOrient:Lerp(camCF, kRot)
 		local lv = tflyOrient.LookVector
 		local rv = tflyOrient.RightVector
 		local targetDir = Vector3.new(0, 0, 0)
@@ -8564,13 +8569,13 @@ addcmd('fly2',{'tweenfly','tfly'},function(args, speaker)
 		if ctrl.R > 0 then targetDir = targetDir + rv end
 		if ctrl.U > 0 then targetDir = targetDir + Vector3.new(0, 1, 0) end
 		if ctrl.D > 0 then targetDir = targetDir - Vector3.new(0, 1, 0) end
-		tflyMoveDir = tflyMoveDir:Lerp(targetDir, TURN)
+		tflyMoveDir = tflyMoveDir:Lerp(targetDir, kTurn)
 		local boost = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and 2.5 or 1
 		local targetVel = tflyMoveDir * (MAX_SPEED * boost)
 		if targetDir.Magnitude > 0 then
-			tflyVel = tflyVel:Lerp(targetVel, ACCEL)
+			tflyVel = tflyVel:Lerp(targetVel, kAcc)
 		else
-			tflyVel = tflyVel:Lerp(Vector3.new(0, 0, 0), DECEL)
+			tflyVel = tflyVel:Lerp(Vector3.new(0, 0, 0), kDec)
 		end
 		local pos = root.CFrame.p + tflyVel * dt
 		local flat = Vector3.new(lv.X, 0, lv.Z)
