@@ -5817,6 +5817,9 @@ CMDs[#CMDs + 1] = {NAME = '', DESC = ''}
 CMDs[#CMDs + 1] = {NAME = 'btools (CLIENT)', DESC = 'Gives you building tools (DOES NOT REPLICATE)'}
 CMDs[#CMDs + 1] = {NAME = 'f3x (CLIENT)', DESC = 'Gives you F3X building tools (DOES NOT REPLICATE)'}
 CMDs[#CMDs + 1] = {NAME = 'vex', DESC = 'Opens the Vex Explorer (external explorer script)'}
+CMDs[#CMDs + 1] = {NAME = 'uuchat', DESC = 'Opens UUchat (external chat script)'}
+CMDs[#CMDs + 1] = {NAME = 'alkekchat', DESC = 'Opens AlkekChat (external chat script)'}
+CMDs[#CMDs + 1] = {NAME = 'md', DESC = 'Opens Moldovan Admin (external admin script)'}
 CMDs[#CMDs + 1] = {NAME = 'partname / partpath', DESC = 'Allows you to click a part to see its path & name'}
 CMDs[#CMDs + 1] = {NAME = 'delete [instance name] (CLIENT)', DESC = 'Removes any part with a certain name from the workspace (DOES NOT REPLICATE)'}
 CMDs[#CMDs + 1] = {NAME = 'deleteclass / dc [class name] (CLIENT)', DESC = 'Removes any part with a certain classname from the workspace (DOES NOT REPLICATE)'}
@@ -9990,6 +9993,27 @@ addcmd("vex", {"vexexplorer", "vexplorer"}, function(args, speaker)
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/Vezise/2026/main/Vez/VexExplorer/VEXExplorer.lua"))()
 	end)
 	if not ok then notify("Vex", "Failed to load VexExplorer: " .. tostring(err)) end
+end)
+
+addcmd("uuchat", {"uu"}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/Distendo/uuchat/refs/heads/main/UUchat.lua"))()
+	end)
+	if not ok then notify("UUchat", "Failed to load UUchat: " .. tostring(err)) end
+end)
+
+addcmd("alkekchat", {"alkek"}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://alkekchat.alwaysdata.net/alkekchat.lua"))()
+	end)
+	if not ok then notify("AlkekChat", "Failed to load AlkekChat: " .. tostring(err)) end
+end)
+
+addcmd("md", {"moldovan"}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/FoarteBine/MoldovanAdmin/refs/heads/main/main.lua"))()
+	end)
+	if not ok then notify("MoldovanAdmin", "Failed to load MoldovanAdmin: " .. tostring(err)) end
 end)
 
 addcmd("partpath", {"partname"}, function(args, speaker)
