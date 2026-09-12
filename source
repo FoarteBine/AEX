@@ -4138,7 +4138,9 @@ local function buildThemeStudio()
 			local hadError = false
 			pcall(function()
 				ContentProvider:PreloadAsync({bgImageFrame}, function(_, st)
-					if st == Enum.ContentStatus.Error then hadError = true end
+					local nm
+					pcall(function() nm = st.Name end)
+					if nm == "Error" then hadError = true end
 				end)
 			end)
 			if hadError then
@@ -5769,6 +5771,7 @@ CMDs[#CMDs + 1] = {NAME = 'lookat [player]', DESC = 'Moves your camera view to a
 CMDs[#CMDs + 1] = {NAME = '', DESC = ''}
 CMDs[#CMDs + 1] = {NAME = 'btools (CLIENT)', DESC = 'Gives you building tools (DOES NOT REPLICATE)'}
 CMDs[#CMDs + 1] = {NAME = 'f3x (CLIENT)', DESC = 'Gives you F3X building tools (DOES NOT REPLICATE)'}
+CMDs[#CMDs + 1] = {NAME = 'vex (CLIENT)', DESC = 'Opens the Vex Explorer (external explorer script)'}
 CMDs[#CMDs + 1] = {NAME = 'partname / partpath', DESC = 'Allows you to click a part to see its path & name'}
 CMDs[#CMDs + 1] = {NAME = 'delete [instance name] (CLIENT)', DESC = 'Removes any part with a certain name from the workspace (DOES NOT REPLICATE)'}
 CMDs[#CMDs + 1] = {NAME = 'deleteclass / dc [class name] (CLIENT)', DESC = 'Removes any part with a certain classname from the workspace (DOES NOT REPLICATE)'}
