@@ -5836,6 +5836,9 @@ CMDs[#CMDs + 1] = {NAME = 'md', DESC = 'Opens Moldovan Admin (external admin scr
 CMDs[#CMDs + 1] = {NAME = 'bptc', DESC = 'Opens BPTC (external script)'}
 CMDs[#CMDs + 1] = {NAME = 'dexre', DESC = 'Opens Dex Recontinued explorer'}
 CMDs[#CMDs + 1] = {NAME = 'ac6', DESC = 'Opens AC6 (external script)'}
+CMDs[#CMDs + 1] = {NAME = 'vehkick', DESC = 'Opens vehicle kick exploit (external script)'}
+CMDs[#CMDs + 1] = {NAME = 'srp', DESC = 'Opens SRP v6 remote spy (external script)'}
+CMDs[#CMDs + 1] = {NAME = 'emotebar', DESC = 'Opens Emote Bar GUI (external script)'}
 CMDs[#CMDs + 1] = {NAME = 'clearws / clearworkspace', DESC = 'Wipes Workspace & Lighting except players, camera and terrain'}
 CMDs[#CMDs + 1] = {NAME = 'heil', DESC = 'Gives the Heil tool: equip + click = frozen salute pose'}
 CMDs[#CMDs + 1] = {NAME = 'antibang', DESC = 'Hold you underground (relative to map) until unantibang'}
@@ -10395,6 +10398,27 @@ addcmd("ac6", {}, function(args, speaker)
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/Roblox-HttpSpy/my-Garbage/refs/heads/main/FeMusicExploit.lua"))()
 	end)
 	if not ok then notify("AC6", "Failed to load AC6: " .. tostring(err)) end
+end)
+
+addcmd("vehkick", {}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/FoarteBine/MoldovanAdmin/refs/heads/main/scripts/kick-exploit.lua"))()
+	end)
+	if not ok then notify("VehKick", "Failed to load VehKick: " .. tostring(err)) end
+end)
+
+addcmd("srp", {}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/FoarteBine/MoldovanAdmin/refs/heads/main/scripts/srp-v6.lua"))()
+	end)
+	if not ok then notify("SRP", "Failed to load SRP: " .. tostring(err)) end
+end)
+
+addcmd("emotebar", {}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/GUIS/Emotes.lua"))()
+	end)
+	if not ok then notify("EmoteBar", "Failed to load EmoteBar: " .. tostring(err)) end
 end)
 
 addcmd("clearws", {"clearworkspace"}, function(args, speaker)
