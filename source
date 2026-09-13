@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1"
+currentVersion = "0.1.1"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -698,6 +698,24 @@ ReferenceButton.Position = UDim2.new(0, 212, 0, 2)
 ReferenceButton.Size = UDim2.new(0, 16, 0, 16)
 ReferenceButton.Image = getcustomasset("aex/assets/reference.png")
 ReferenceButton.ZIndex = 10
+
+ExpandButton = Instance.new("TextButton")
+ExpandButton.Name = "ExpandButton"
+ExpandButton.Parent = Holder
+ExpandButton.BackgroundTransparency = 1
+ExpandButton.Position = UDim2.new(0, 194, 0, 2)
+ExpandButton.Size = UDim2.new(0, 16, 0, 16)
+ExpandButton.Font = Enum.Font.GothamBold
+ExpandButton.TextSize = 16
+ExpandButton.TextColor3 = Color3.new(1, 1, 1)
+ExpandButton.Text = "+"
+ExpandButton.Tooltip = "Open full command reference"
+ExpandButton.AutoButtonColor = false
+ExpandButton.ZIndex = 10
+aexHover(ExpandButton)
+ExpandButton.MouseButton1Click:Connect(function()
+	toggleCommandsRef()
+end)
 
 Settings.Name = "Settings"
 Settings.Parent = Holder
@@ -6065,6 +6083,203 @@ CMDs[#CMDs + 1] = {NAME = 'addplugin / plugin [name]', DESC = 'Add a plugin via 
 CMDs[#CMDs + 1] = {NAME = 'removeplugin / deleteplugin [name]', DESC = 'Remove a plugin via command'}
 CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
+
+-- AEX: full command reference window (toggled by the + button in the title bar)
+local refSectionTitles = {
+	discord = 'General', noclip = 'Movement', setwaypoint = 'Waypoints', goto = 'Teleport',
+	logs = 'Logging', esp = 'Visuals', spectate = 'Camera', btools = 'Utility',
+	fullbright = 'Environment', inspect = 'Player Info', reset = 'Character',
+	animation = 'Animations', autoclick = 'Automation', tools = 'Tools',
+	addalias = 'Aliases', addplugin = 'Plugins',
+}
+local refGui
+local refSectionColor = Color3.fromRGB(120, 175, 255)
+local refFontFace = (function()
+	local ok, f = pcall(function() return Enum.Font[uiFont or "Gotham"] end)
+	if ok then return f end
+	return Enum.Font.Gotham
+end)()
+
+local function refAddHeader(parent, text)
+	local lbl = Instance.new("TextLabel")
+	lbl.Parent = parent
+	lbl.BackgroundTransparency = 1
+	lbl.Size = UDim2.new(1, -8, 0, 30)
+	lbl.Font = Enum.Font.GothamBold
+	lbl.TextSize = 15
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.TextColor3 = refSectionColor
+	lbl.Text = string.upper(text)
+	return lbl
+end
+
+local function refAddRow(parent, entry)
+	local btn = Instance.new("TextButton")
+	btn.Parent = parent
+	btn.BackgroundColor3 = Color3.fromRGB(45, 45, 46)
+	btn.BorderSizePixel = 0
+	btn.Size = UDim2.new(1, -8, 0, 24)
+	btn.AutoButtonColor = false
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Parent = btn
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Position = UDim2.new(0, 6, 0, 0)
+	nameLabel.Size = UDim2.new(0, 200, 1, 0)
+	nameLabel.Font = refFontFace
+	nameLabel.TextSize = 14
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.TextColor3 = Color3.new(1, 1, 1)
+	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	nameLabel.Text = entry.NAME
+	local descLabel = Instance.new("TextLabel")
+	descLabel.Parent = btn
+	descLabel.BackgroundTransparency = 1
+	descLabel.Position = UDim2.new(0, 212, 0, 0)
+	descLabel.Size = UDim2.new(1, -218, 1, 0)
+	descLabel.Font = refFontFace
+	descLabel.TextSize = 14
+	descLabel.TextXAlignment = Enum.TextXAlignment.Left
+	descLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+	descLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	descLabel.Text = entry.DESC
+	pcall(aexRound, btn, 6)
+	aexHover(btn)
+	btn.MouseButton1Click:Connect(function()
+		local c = (entry.NAME:match("^(%S+)") or entry.NAME)
+		pcall(function()
+			if PARENT then PARENT.Enabled = true end
+			Cmdbar.Text = prefix .. c .. " "
+			Cmdbar.CursorPosition = #Cmdbar.Text + 1
+			Cmdbar:CaptureFocus()
+		end)
+		if refGui then refGui.Enabled = false end
+	end)
+	return btn
+end
+
+local function buildCommandsRef()
+	local parentGui
+	if gethui then pcall(function() parentGui = gethui() end) end
+	if not parentGui then parentGui = COREGUI end
+	refGui = Instance.new("ScreenGui")
+	refGui.Name = "AEXCommandsRef"
+	refGui.ResetOnSpawn = false
+	refGui.IgnoreGuiInset = true
+	refGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	refGui.DisplayOrder = 8
+	refGui.Enabled = false
+	refGui.Parent = parentGui
+
+	local win = Instance.new("Frame")
+	win.Parent = refGui
+	win.AnchorPoint = Vector2.new(0.5, 0.5)
+	win.Position = UDim2.new(0.5, 0, 0.5, 0)
+	local vp = workspace.CurrentCamera.ViewportSize
+	win.Size = UDim2.new(0, math.clamp(vp.X * 0.6, 560, 980), 0, math.clamp(vp.Y * 0.7, 340, 680))
+	win.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
+	win.BorderSizePixel = 0
+	pcall(aexRound, win, 12)
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Parent = win
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Position = UDim2.new(0, 10, 0, 0)
+	titleLabel.Size = UDim2.new(1, -60, 0, 36)
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextSize = 16
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.TextColor3 = Color3.new(1, 1, 1)
+	titleLabel.Text = "Command Reference"
+
+	local hintLabel = Instance.new("TextLabel")
+	hintLabel.Parent = win
+	hintLabel.BackgroundTransparency = 1
+	hintLabel.Position = UDim2.new(1, -220, 0, 0)
+	hintLabel.Size = UDim2.new(0, 180, 0, 36)
+	hintLabel.Font = refFontFace
+	hintLabel.TextSize = 12
+	hintLabel.TextXAlignment = Enum.TextXAlignment.Right
+	hintLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
+	hintLabel.Text = "click = insert into bar"
+
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Parent = win
+	closeBtn.BackgroundTransparency = 1
+	closeBtn.Position = UDim2.new(1, -32, 0, 8)
+	closeBtn.Size = UDim2.new(0, 20, 0, 20)
+	closeBtn.Font = Enum.Font.GothamBold
+	closeBtn.TextSize = 14
+	closeBtn.TextColor3 = Color3.new(1, 1, 1)
+	closeBtn.Text = "X"
+	closeBtn.AutoButtonColor = false
+	aexHover(closeBtn)
+	closeBtn.MouseButton1Click:Connect(function()
+		refGui.Enabled = false
+	end)
+
+	local list = Instance.new("ScrollingFrame")
+	list.Parent = win
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.Position = UDim2.new(0, 4, 0, 38)
+	list.Size = UDim2.new(1, -8, 1, -42)
+	list.ScrollBarImageColor3 = Color3.fromRGB(78, 78, 79)
+	list.ScrollBarThickness = 5
+	list.CanvasPosition = Vector2.new(0, 0)
+	local layout = Instance.new("UIListLayout")
+	layout.Parent = list
+	layout.Padding = UDim.new(0, 2)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+	local n = #CMDs
+	local function firstToken(idx)
+		if idx and CMDs[idx] and CMDs[idx].NAME ~= "" then
+			return CMDs[idx].NAME:match("^(%S+)")
+		end
+	end
+	local i = 1
+	local sectionTitle = refSectionTitles[firstToken(1)] or 'Other'
+	while i <= n do
+		if CMDs[i].NAME == "" then
+			local j = i + 1
+			while j <= n and CMDs[j].NAME == "" do j = j + 1 end
+			if j <= n then
+				refAddHeader(list, refSectionTitles[firstToken(j)] or 'Other')
+			end
+			i = j
+		else
+			refAddRow(list, CMDs[i])
+			i = i + 1
+		end
+	end
+	refAddHeader(list, sectionTitle)
+	-- move first section header to the top
+	local kids = list:GetChildren()
+	for _, el in kids do
+		if el:IsA("TextLabel") and el.Text == string.upper(sectionTitle) then
+			el.LayoutOrder = -1
+			break
+		end
+	end
+end
+
+function toggleCommandsRef()
+	if not refGui then
+		buildCommandsRef()
+	end
+	if refGui then
+		refGui.Enabled = not refGui.Enabled
+	end
+end
+
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if refGui and refGui.Enabled and input.KeyCode == Enum.KeyCode.Escape then
+		refGui.Enabled = false
+	end
+end)
 -- wait()
 
 for i = 1, #CMDs do
