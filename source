@@ -5825,6 +5825,8 @@ CMDs[#CMDs + 1] = {NAME = 'bptc', DESC = 'Opens BPTC (external script)'}
 CMDs[#CMDs + 1] = {NAME = 'dexre', DESC = 'Opens Dex Recontinued explorer'}
 CMDs[#CMDs + 1] = {NAME = 'clearws / clearworkspace', DESC = 'Wipes Workspace & Lighting except players, camera and terrain'}
 CMDs[#CMDs + 1] = {NAME = 'heil', DESC = 'Gives the Heil tool: equip + click = frozen salute pose'}
+CMDs[#CMDs + 1] = {NAME = 'antibang', DESC = 'Void-dip for 0.7s to dodge bang/expel kills'}
+CMDs[#CMDs + 1] = {NAME = 'unantibang', DESC = 'Instantly cancels antibang dip and restores'}
 CMDs[#CMDs + 1] = {NAME = 'partname / partpath', DESC = 'Allows you to click a part to see its path & name'}
 CMDs[#CMDs + 1] = {NAME = 'delete [instance name] (CLIENT)', DESC = 'Removes any part with a certain name from the workspace (DOES NOT REPLICATE)'}
 CMDs[#CMDs + 1] = {NAME = 'deleteclass / dc [class name] (CLIENT)', DESC = 'Removes any part with a certain classname from the workspace (DOES NOT REPLICATE)'}
@@ -10327,6 +10329,52 @@ addcmd("heil", {}, function(args, speaker)
 	Tool.Activated:Connect(Activated)
 	Tool.Unequipped:Connect(Unequipped)
 	notify("Heil added to your backpack. Equip and click to salute.", "AEX")
+end)
+
+local antibangActive = false
+local antibangSavedHeight
+local antibangSavedCFrame
+local antibangTimer
+local function antibangRestore()
+	if not antibangActive then return end
+	antibangActive = false
+	if antibangTimer then
+		task.cancel(antibangTimer)
+		antibangTimer = nil
+	end
+	local char = Players.LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if hrp and antibangSavedCFrame then
+		pcall(function() hrp.CFrame = antibangSavedCFrame end)
+	end
+	if antibangSavedHeight then
+		workspace.FallenPartsDestroyHeight = antibangSavedHeight
+		antibangSavedHeight = nil
+	end
+	antibangSavedCFrame = nil
+end
+
+addcmd("antibang", {}, function(args, speaker)
+	local char = speaker.Character or Players.LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		notify("No HumanoidRootPart found", "AEX")
+		return
+	end
+	if antibangActive then return end
+	antibangActive = true
+	antibangSavedHeight = workspace.FallenPartsDestroyHeight
+	antibangSavedCFrame = hrp.CFrame
+	workspace.FallenPartsDestroyHeight = -1000
+	pcall(function() hrp.CFrame = CFrame.new(Vector3.new(0, -500, 0)) end)
+	antibangTimer = task.delay(0.7, function()
+		antibangTimer = nil
+		antibangRestore()
+	end)
+end)
+
+addcmd("unantibang", {"noantibang"}, function(args, speaker)
+	antibangRestore()
 end)
 
 addcmd("partpath", {"partname"}, function(args, speaker)
