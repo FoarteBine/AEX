@@ -6086,11 +6086,11 @@ CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all ava
 
 -- AEX: full command reference window (toggled by the + button in the title bar)
 local refSectionTitles = {
-	discord = 'General', noclip = 'Movement', setwaypoint = 'Waypoints', goto = 'Teleport',
-	logs = 'Logging', esp = 'Visuals', spectate = 'Camera', btools = 'Utility',
-	fullbright = 'Environment', inspect = 'Player Info', reset = 'Character',
-	animation = 'Animations', autoclick = 'Automation', tools = 'Tools',
-	addalias = 'Aliases', addplugin = 'Plugins',
+	["discord"] = 'General', ["noclip"] = 'Movement', ["setwaypoint"] = 'Waypoints', ["goto"] = 'Teleport',
+	["logs"] = 'Logging', ["esp"] = 'Visuals', ["spectate"] = 'Camera', ["btools"] = 'Utility',
+	["fullbright"] = 'Environment', ["inspect"] = 'Player Info', ["reset"] = 'Character',
+	["animation"] = 'Animations', ["autoclick"] = 'Automation', ["tools"] = 'Tools',
+	["addalias"] = 'Aliases', ["addplugin"] = 'Plugins',
 }
 local refGui
 local refSectionColor = Color3.fromRGB(120, 175, 255)
