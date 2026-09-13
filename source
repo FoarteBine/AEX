@@ -10363,10 +10363,11 @@ addcmd("antibang", {}, function(args, speaker)
 	end
 	if antibangActive then return end
 	antibangActive = true
-	antibangSavedHeight = workspace.FallenPartsDestroyHeight
+	local base = workspace.FallenPartsDestroyHeight
+	antibangSavedHeight = base
 	antibangSavedCFrame = hrp.CFrame
-	workspace.FallenPartsDestroyHeight = -1000
-	pcall(function() hrp.CFrame = CFrame.new(Vector3.new(0, -500, 0)) end)
+	workspace.FallenPartsDestroyHeight = base - 500
+	pcall(function() hrp.CFrame = CFrame.new(Vector3.new(0, base, 0)) end)
 	antibangTimer = task.delay(0.7, function()
 		antibangTimer = nil
 		antibangRestore()
