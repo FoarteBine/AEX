@@ -5835,6 +5835,7 @@ CMDs[#CMDs + 1] = {NAME = 'alkekchat', DESC = 'Opens AlkekChat (external chat sc
 CMDs[#CMDs + 1] = {NAME = 'md', DESC = 'Opens Moldovan Admin (external admin script)'}
 CMDs[#CMDs + 1] = {NAME = 'bptc', DESC = 'Opens BPTC (external script)'}
 CMDs[#CMDs + 1] = {NAME = 'dexre', DESC = 'Opens Dex Recontinued explorer'}
+CMDs[#CMDs + 1] = {NAME = 'ac6', DESC = 'Opens AC6 (external script)'}
 CMDs[#CMDs + 1] = {NAME = 'clearws / clearworkspace', DESC = 'Wipes Workspace & Lighting except players, camera and terrain'}
 CMDs[#CMDs + 1] = {NAME = 'heil', DESC = 'Gives the Heil tool: equip + click = frozen salute pose'}
 CMDs[#CMDs + 1] = {NAME = 'antibang', DESC = 'Hold you underground (relative to map) until unantibang'}
@@ -10387,6 +10388,13 @@ addcmd("dexre", {"dexrecontinued"}, function(args, speaker)
 		loadstring(game:HttpGet("https://github.com/Tesker-103/DexRecontinued/releases/latest/download/out.lua"))()
 	end)
 	if not ok then notify("Dex Recontinued", "Failed to load Dex Recontinued: " .. tostring(err)) end
+end)
+
+addcmd("ac6", {}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/Roblox-HttpSpy/my-Garbage/refs/heads/main/FeMusicExploit.lua"))()
+	end)
+	if not ok then notify("AC6", "Failed to load AC6: " .. tostring(err)) end
 end)
 
 addcmd("clearws", {"clearworkspace"}, function(args, speaker)
