@@ -5839,6 +5839,7 @@ CMDs[#CMDs + 1] = {NAME = 'ac6', DESC = 'Opens AC6 (external script)'}
 CMDs[#CMDs + 1] = {NAME = 'vehkick', DESC = 'Opens vehicle kick exploit (external script)'}
 CMDs[#CMDs + 1] = {NAME = 'srp', DESC = 'Opens SRP v6 remote spy (external script)'}
 CMDs[#CMDs + 1] = {NAME = 'emotebar', DESC = 'Opens Emote Bar GUI (external script)'}
+CMDs[#CMDs + 1] = {NAME = 'showownership / netown', DESC = 'Shows NetworkOwner of parts (external script)'}
 CMDs[#CMDs + 1] = {NAME = 'clearws / clearworkspace', DESC = 'Wipes Workspace & Lighting except players, camera and terrain'}
 CMDs[#CMDs + 1] = {NAME = 'heil', DESC = 'Gives the Heil tool: equip + click = frozen salute pose'}
 CMDs[#CMDs + 1] = {NAME = 'antibang', DESC = 'Hold you underground (relative to map) until unantibang'}
@@ -10419,6 +10420,13 @@ addcmd("emotebar", {}, function(args, speaker)
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/GUIS/Emotes.lua"))()
 	end)
 	if not ok then notify("EmoteBar", "Failed to load EmoteBar: " .. tostring(err)) end
+end)
+
+addcmd("showownership", {"netown", "shownetworkownership"}, function(args, speaker)
+	local ok, err = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/FoarteBine/MoldovanAdmin/refs/heads/main/scripts/show-ownership.lua"))()
+	end)
+	if not ok then notify("ShowOwnership", "Failed to load NetworkOwnership view: " .. tostring(err)) end
 end)
 
 addcmd("clearws", {"clearworkspace"}, function(args, speaker)
