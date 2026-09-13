@@ -705,7 +705,7 @@ ExpandButton.Parent = Holder
 ExpandButton.BackgroundTransparency = 1
 ExpandButton.Position = UDim2.new(0, 194, 0, 2)
 ExpandButton.Size = UDim2.new(0, 16, 0, 16)
-ExpandButton.Image = getcustomasset("aex/assets/minimize.png")
+ExpandButton.Image = "rbxassetid://103624489836882"
 ExpandButton.ZIndex = 10
 ExpandButton.MouseButton1Click:Connect(function()
 	toggleCommandsRef()
@@ -6110,13 +6110,16 @@ end
 local function refAddRow(parent, entry)
 	local function insertCmd()
 		local c = (entry.NAME:match("^(%S+)") or entry.NAME)
+		-- close reference first: disabling its ScreenGui otherwise steals Cmdbar
+		-- focus via FocusLost(false) and the Text gets wiped by the standard handler
+		if refGui then refGui.Enabled = false end
 		pcall(function()
 			if PARENT then PARENT.Enabled = true end
+			task.wait()
 			Cmdbar.Text = c .. " "
 			Cmdbar.CursorPosition = #Cmdbar.Text + 1
 			Cmdbar:CaptureFocus()
 		end)
-		if refGui then refGui.Enabled = false end
 	end
 	local btn = Instance.new("TextButton")
 	btn.Parent = parent
