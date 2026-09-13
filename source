@@ -709,7 +709,6 @@ ExpandButton.Font = Enum.Font.GothamBold
 ExpandButton.TextSize = 16
 ExpandButton.TextColor3 = Color3.new(1, 1, 1)
 ExpandButton.Text = "+"
-ExpandButton.Tooltip = "Open full command reference"
 ExpandButton.AutoButtonColor = false
 ExpandButton.ZIndex = 10
 aexHover(ExpandButton)
