@@ -699,19 +699,14 @@ ReferenceButton.Size = UDim2.new(0, 16, 0, 16)
 ReferenceButton.Image = getcustomasset("aex/assets/reference.png")
 ReferenceButton.ZIndex = 10
 
-ExpandButton = Instance.new("TextButton")
+ExpandButton = Instance.new("ImageButton")
 ExpandButton.Name = "ExpandButton"
 ExpandButton.Parent = Holder
 ExpandButton.BackgroundTransparency = 1
 ExpandButton.Position = UDim2.new(0, 194, 0, 2)
 ExpandButton.Size = UDim2.new(0, 16, 0, 16)
-ExpandButton.Font = Enum.Font.GothamBold
-ExpandButton.TextSize = 16
-ExpandButton.TextColor3 = Color3.new(1, 1, 1)
-ExpandButton.Text = "+"
-ExpandButton.AutoButtonColor = false
+ExpandButton.Image = getcustomasset("aex/assets/minimize.png")
 ExpandButton.ZIndex = 10
-aexHover(ExpandButton)
 ExpandButton.MouseButton1Click:Connect(function()
 	toggleCommandsRef()
 end)
