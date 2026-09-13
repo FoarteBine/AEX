@@ -705,7 +705,7 @@ ExpandButton.Parent = Holder
 ExpandButton.BackgroundTransparency = 1
 ExpandButton.Position = UDim2.new(0, 194, 0, 2)
 ExpandButton.Size = UDim2.new(0, 16, 0, 16)
-ExpandButton.Image = "rbxassetid://103624489836882"
+ExpandButton.Image = "rbxassetid://133096532651175"
 ExpandButton.ZIndex = 10
 ExpandButton.MouseButton1Click:Connect(function()
 	toggleCommandsRef()
