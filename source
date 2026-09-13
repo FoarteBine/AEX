@@ -6113,46 +6113,47 @@ local function refAddHeader(parent, text)
 end
 
 local function refAddRow(parent, entry)
+	local function insertCmd()
+		local c = (entry.NAME:match("^(%S+)") or entry.NAME)
+		pcall(function()
+			if PARENT then PARENT.Enabled = true end
+			Cmdbar.Text = c .. " "
+			Cmdbar.CursorPosition = #Cmdbar.Text + 1
+			Cmdbar:CaptureFocus()
+		end)
+		if refGui then refGui.Enabled = false end
+	end
 	local btn = Instance.new("TextButton")
 	btn.Parent = parent
 	btn.BackgroundColor3 = Color3.fromRGB(45, 45, 46)
 	btn.BorderSizePixel = 0
 	btn.Size = UDim2.new(1, -8, 0, 24)
 	btn.AutoButtonColor = false
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Parent = btn
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Position = UDim2.new(0, 6, 0, 0)
-	nameLabel.Size = UDim2.new(0, 200, 1, 0)
-	nameLabel.Font = refFontFace
-	nameLabel.TextSize = 14
-	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.TextColor3 = Color3.new(1, 1, 1)
-	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-	nameLabel.Text = entry.NAME
-	local descLabel = Instance.new("TextLabel")
-	descLabel.Parent = btn
-	descLabel.BackgroundTransparency = 1
-	descLabel.Position = UDim2.new(0, 212, 0, 0)
-	descLabel.Size = UDim2.new(1, -218, 1, 0)
-	descLabel.Font = refFontFace
-	descLabel.TextSize = 14
-	descLabel.TextXAlignment = Enum.TextXAlignment.Left
-	descLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-	descLabel.TextTruncate = Enum.TextTruncate.AtEnd
-	descLabel.Text = entry.DESC
+	btn.Font = refFontFace
+	btn.TextSize = 14
+	btn.TextXAlignment = Enum.TextXAlignment.Left
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.TextTruncate = Enum.TextTruncate.AtEnd
+	btn.Text = entry.NAME
+	local pad = Instance.new("UIPadding")
+	pad.Parent = btn
+	pad.PaddingLeft = UDim.new(0, 6)
+	local descBtn = Instance.new("TextButton")
+	descBtn.Parent = btn
+	descBtn.BackgroundTransparency = 1
+	descBtn.Position = UDim2.new(0, 212, 0, 0)
+	descBtn.Size = UDim2.new(1, -218, 1, 0)
+	descBtn.Font = refFontFace
+	descBtn.TextSize = 14
+	descBtn.TextXAlignment = Enum.TextXAlignment.Left
+	descBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
+	descBtn.TextTruncate = Enum.TextTruncate.AtEnd
+	descBtn.Text = entry.DESC
+	descBtn.AutoButtonColor = false
 	pcall(aexRound, btn, 6)
 	aexHover(btn)
-	btn.MouseButton1Click:Connect(function()
-		local c = (entry.NAME:match("^(%S+)") or entry.NAME)
-		pcall(function()
-			if PARENT then PARENT.Enabled = true end
-			Cmdbar.Text = prefix .. c .. " "
-			Cmdbar.CursorPosition = #Cmdbar.Text + 1
-			Cmdbar:CaptureFocus()
-		end)
-		if refGui then refGui.Enabled = false end
-	end)
+	btn.MouseButton1Click:Connect(insertCmd)
+	descBtn.MouseButton1Click:Connect(insertCmd)
 	return btn
 end
 
