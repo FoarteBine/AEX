@@ -5709,7 +5709,12 @@ CMDs[#CMDs + 1] = {NAME = '', DESC = ''}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
-CMDs[#CMDs + 1] = {NAME = 'fly2 / tweenfly / tfly [speed]', DESC = 'Smooth tween fly: camera-follow, Shift boost, noclip in air'}
+CMDs[#CMDs + 1] = {NAME = 'fly2 / tweenfly / tfly [speed]', DESC = 'Smooth fly (default speed is 100), Shift boosts it'}
+CMDs[#CMDs + 1] = {NAME = 'unfly2 / unfly', DESC = 'Disables fly2'}
+CMDs[#CMDs + 1] = {NAME = 'fly2speed / tflyspeed [num]', DESC = 'Set fly2 speed while flying'}
+CMDs[#CMDs + 1] = {NAME = 'fly2smooth / tflysmooth [0-1]', DESC = 'fly2 rotation smoothing (0 = instant, 1 = very smooth)'}
+CMDs[#CMDs + 1] = {NAME = 'fly2tiltmax / tflytiltmax [num]', DESC = 'fly2 maximum tilt angle (default is 25)'}
+CMDs[#CMDs + 1] = {NAME = 'fly2tiltinc / tflytiltinc [num]', DESC = 'fly2 how fast it reaches that tilt (default is 1)'}
 CMDs[#CMDs + 1] = {NAME = 'unfly', DESC = 'Disables fly'}
 CMDs[#CMDs + 1] = {NAME = 'flyspeed [num]', DESC = 'Set fly speed (default is 20)'}
 CMDs[#CMDs + 1] = {NAME = 'vehiclefly / vfly [speed]', DESC = 'Makes you fly in a vehicle'}
@@ -9449,42 +9454,256 @@ local mobilefly = function(speaker, vfly)
 	end)
 end
 
--- // tween-based fly (fly2): moves RootPart with TweenService instead of BodyVelocity
-local tweenFlyConn
-local tflyKeyDown
-local tflyKeyUp
-local tflyTween
-local tflyVel
-local tflyMoveDir
-local tflyOrient
-local tflyLastFlat
-local tflyParts
-local tflyPartsChar
-function stopTweenFly()
-	FLYING = false
-	if tweenFlyConn then tweenFlyConn:Disconnect(); tweenFlyConn = nil end
-	if tflyKeyDown then tflyKeyDown:Disconnect(); tflyKeyDown = nil end
-	if tflyKeyUp then tflyKeyUp:Disconnect(); tflyKeyUp = nil end
-	if tflyTween then pcall(function() tflyTween:Cancel() end); tflyTween = nil end
-	if tflyParts then
-		for _, p in ipairs(tflyParts) do
-			pcall(function() p.CanCollide = true end)
+-- // fly2 (tweenfly): camera-follow flight driven by BodyPosition + BodyGyro (HDfly engine)
+-- all state lives in one table so the top-level chunk does not run out of local slots
+local tfly = {
+	settings = {
+		speed = 100,          -- fly2speed / fly2 [speed]
+		smoothRotation = true,
+		rotationSmoothness = 0,
+		tiltMax = 25,
+		tiltInc = 1,
+	},
+	move = {Forward = 0, Back = 0, Left = 0, Right = 0, Up = 0, Down = 0},
+	savedHum = {},
+	fixedDelta = 1 / 60,
+	lastPos = Vector3.new(),
+	dirVec = Vector3.new(),
+	tilt = 0,
+	static = 0,
+}
+
+function tfly.isOn()
+	return tfly.force ~= nil and tfly.gyro ~= nil
+end
+
+function tfly.resetState()
+	tfly.move = {Forward = 0, Back = 0, Left = 0, Right = 0, Up = 0, Down = 0}
+	tfly.lastPos = Vector3.new()
+	tfly.tilt = 0
+	tfly.static = 0
+	tfly.dirVec = Vector3.new()
+end
+
+function tfly.setKey(key, state)
+	local move = tfly.move
+	if key == Enum.KeyCode.W then
+		move.Forward = state
+	elseif key == Enum.KeyCode.S then
+		move.Back = state
+	elseif key == Enum.KeyCode.A then
+		move.Left = state
+	elseif key == Enum.KeyCode.D then
+		move.Right = state
+	elseif key == Enum.KeyCode.Space or key == Enum.KeyCode.E then
+		move.Up = state
+	elseif key == Enum.KeyCode.LeftControl or key == Enum.KeyCode.Q or key == Enum.KeyCode.C then
+		move.Down = state
+	end
+end
+
+function tfly.captureKeys()
+	local down = UserInputService
+	tfly.setKey(Enum.KeyCode.W, down:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+	tfly.setKey(Enum.KeyCode.S, down:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
+	tfly.setKey(Enum.KeyCode.A, down:IsKeyDown(Enum.KeyCode.A) and 1 or 0)
+	tfly.setKey(Enum.KeyCode.D, down:IsKeyDown(Enum.KeyCode.D) and 1 or 0)
+	tfly.setKey(Enum.KeyCode.Space, (down:IsKeyDown(Enum.KeyCode.Space) or down:IsKeyDown(Enum.KeyCode.E)) and 1 or 0)
+	tfly.setKey(Enum.KeyCode.LeftControl, (down:IsKeyDown(Enum.KeyCode.LeftControl) or down:IsKeyDown(Enum.KeyCode.Q) or down:IsKeyDown(Enum.KeyCode.C)) and 1 or 0)
+end
+
+function tfly.nextMovement(delta, speed)
+	local move = tfly.move
+	local cf = CFrame.new()
+	local dir = Vector3.new()
+	if move.Forward == 1 then
+		cf = cf * CFrame.new(0, 0, -speed * delta)
+		dir = dir + Vector3.new(0, 0, -1)
+	end
+	if move.Back == 1 then
+		cf = cf * CFrame.new(0, 0, speed * delta)
+		dir = dir + Vector3.new(0, 0, 1)
+	end
+	if move.Left == 1 then
+		cf = cf * CFrame.new(-speed * delta, 0, 0)
+		dir = dir + Vector3.new(-1, 0, 0)
+	end
+	if move.Right == 1 then
+		cf = cf * CFrame.new(speed * delta, 0, 0)
+		dir = dir + Vector3.new(1, 0, 0)
+	end
+	if move.Up == 1 then
+		cf = cf * CFrame.new(0, speed * delta, 0)
+		dir = dir + Vector3.new(0, 1, 0)
+	end
+	if move.Down == 1 then
+		cf = cf * CFrame.new(0, -speed * delta, 0)
+		dir = dir + Vector3.new(0, -1, 0)
+	end
+	return cf, dir
+end
+
+function tfly.clearMovers()
+	if tfly.force then
+		pcall(function() tfly.force:Destroy() end)
+		tfly.force = nil
+	end
+	if tfly.gyro then
+		pcall(function() tfly.gyro:Destroy() end)
+		tfly.gyro = nil
+	end
+end
+
+function tfly.makeMovers(root)
+	tfly.clearMovers()
+	tfly.force = Instance.new("BodyPosition")
+	tfly.force.Name = "AEXFly2"
+	tfly.force.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+	tfly.force.Position = root.Position + Vector3.new(0, 4, 0)
+	tfly.force.Parent = root
+	tfly.gyro = Instance.new("BodyGyro")
+	tfly.gyro.Name = "AEXFly2Gyro"
+	tfly.gyro.D = 50
+	tfly.gyro.P = 200
+	tfly.gyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+	tfly.gyro.CFrame = root.CFrame
+	tfly.gyro.Parent = root
+end
+
+function tfly.saveHumanoid(hum)
+	if hum and tfly.savedHum.PlatformStand == nil then
+		tfly.savedHum = {PlatformStand = hum.PlatformStand, AutoRotate = hum.AutoRotate}
+	end
+end
+
+function tfly.renderStep()
+	if not FLYING or not tfly.isOn() then return end
+	local plr = tfly.player or Players.LocalPlayer
+	local char = plr.Character
+	local root = char and getRoot(char)
+	if not root then return end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if tfly.force.Parent ~= root or tfly.gyro.Parent ~= root then
+		-- respawned: the movers went away with the old character
+		tfly.savedHum = {}
+		tfly.makeMovers(root)
+	end
+	if hum then
+		tfly.saveHumanoid(hum)
+		hum.PlatformStand = true
+		hum.AutoRotate = false
+	end
+	local boost = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and 2 or 1
+	local move, dirVec = tfly.nextMovement(tfly.fixedDelta, tfly.settings.speed * 10 * boost)
+	local cam = workspace.CurrentCamera
+	local look
+	if cam then
+		local focusVec = cam.Focus.p - cam.CFrame.p
+		if focusVec.Magnitude > 0.05 then
+			look = focusVec.Unit
+		else
+			look = cam.CFrame.LookVector
+		end
+	else
+		look = root.CFrame.LookVector
+	end
+	local pos = root.Position
+	local targetCF = CFrame.new(pos, pos + look) * move
+	local targetD = 750 + (tfly.settings.speed * 0.2)
+	if move.p ~= Vector3.new() then
+		tfly.static = 0
+		tfly.force.D = targetD
+		tfly.tilt = tfly.tilt + tfly.settings.tiltInc
+		tfly.force.Position = targetCF.p
+		tfly.dirVec = dirVec
+	else
+		tfly.static = tfly.static + 1
+		tfly.tilt = 1
+		if (root.Position - tfly.lastPos).Magnitude > 6 and tfly.static >= 4 then
+			tfly.force.Position = root.Position
 		end
 	end
-	tflyParts = nil
-	tflyPartsChar = nil
-	tflyVel = nil
-	tflyMoveDir = nil
-	tflyOrient = nil
-	tflyLastFlat = nil
-	local char = Players.LocalPlayer.Character
-	if char then
-		local hum = char:FindFirstChildWhichIsA("Humanoid")
-		if hum then hum.PlatformStand = false end
-		local r = char:FindFirstChild("HumanoidRootPart")
-		if r then pcall(function() r.Anchored = false end) end
+	if math.abs(tfly.tilt) > tfly.settings.tiltMax then
+		tfly.tilt = tfly.settings.tiltMax
 	end
+	if tfly.force.D == targetD then
+		local tiltCF = targetCF * CFrame.Angles(math.rad(tfly.tilt * tfly.dirVec.Z), 0, 0)
+		local smooth = tfly.settings.smoothRotation and tfly.settings.rotationSmoothness or 0
+		if smooth > 0 then
+			tfly.gyro.CFrame = tfly.gyro.CFrame:Lerp(tiltCF, smooth)
+			root.CFrame = root.CFrame:Lerp(CFrame.new(root.Position, root.Position + look), smooth)
+		else
+			tfly.gyro.CFrame = tiltCF
+		end
+	end
+	tfly.lastPos = root.Position
+end
+
+function stopTweenFly()
+	FLYING = false
+	if tfly.renderConn then
+		tfly.renderConn:Disconnect()
+		tfly.renderConn = nil
+	end
+	if tfly.keyDown then
+		tfly.keyDown:Disconnect()
+		tfly.keyDown = nil
+	end
+	if tfly.keyUp then
+		tfly.keyUp:Disconnect()
+		tfly.keyUp = nil
+	end
+	tfly.clearMovers()
+	tfly.resetState()
+	local plr = tfly.player or Players.LocalPlayer
+	local char = plr and plr.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		if tfly.savedHum.PlatformStand ~= nil then hum.PlatformStand = tfly.savedHum.PlatformStand end
+		if tfly.savedHum.AutoRotate ~= nil then hum.AutoRotate = tfly.savedHum.AutoRotate end
+	end
+	tfly.savedHum = {}
+	tfly.player = nil
 	pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Custom end)
+end
+
+function startTweenFly(speed, speaker)
+	if speed and isNumber(speed) then
+		tfly.settings.speed = tonumber(speed)
+	end
+	if FLYING and tfly.isOn() then return end
+	local targ = speaker or Players.LocalPlayer
+	local char = targ.Character or targ.CharacterAdded:Wait()
+	local root = char and getRoot(char)
+	if not root then return end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	FLYING = false
+	NOFLY()
+	stopTweenFly()
+	pcall(function() unmobilefly(targ) end)
+	if flyKeyDown or flyKeyUp then
+		pcall(function() flyKeyDown:Disconnect() flyKeyUp:Disconnect() end)
+	end
+	tfly.player = targ
+	tfly.savedHum = {}
+	tfly.saveHumanoid(hum)
+	tfly.makeMovers(root)
+	if hum then
+		hum.PlatformStand = true
+		hum.AutoRotate = false
+	end
+	FLYING = true
+	tfly.resetState()
+	tfly.lastPos = root.Position
+	tfly.captureKeys()
+	tfly.keyDown = UserInputService.InputBegan:Connect(function(input, gp)
+		if gp then return end
+		tfly.setKey(input.KeyCode, 1)
+	end)
+	tfly.keyUp = UserInputService.InputEnded:Connect(function(input)
+		tfly.setKey(input.KeyCode, 0)
+	end)
+	tfly.renderConn = RunService.RenderStepped:Connect(tfly.renderStep)
 end
 
 addcmd('fly',{},function(args, speaker)
@@ -9514,101 +9733,41 @@ addcmd('unfly',{'nofly','novfly','unvehiclefly','novehiclefly','unvfly','unfly2'
 end)
 
 addcmd('fly2',{'tweenfly','tfly'},function(args, speaker)
-	local speed = aexflyspeed or 1
-	if args[1] and isNumber(args[1]) then
-		aexflyspeed = tonumber(args[1])
-		speed = aexflyspeed
+	local speed = tonumber(args[1])
+	if speed and FLYING and tfly.isOn() then
+		tfly.settings.speed = speed
+	else
+		startTweenFly(speed, speaker)
 	end
-	NOFLY()
-	unmobilefly(speaker)
-	stopTweenFly()
-	if flyKeyDown or flyKeyUp then flyKeyDown:Disconnect() flyKeyUp:Disconnect() end
-	local char = speaker.Character
-	if not char then return end
-	local root = getRoot(char)
-	if not root then return end
-	local hum = char:FindFirstChildWhichIsA("Humanoid")
-	FLYING = true
-	if hum then hum.PlatformStand = true end
-	pcall(function() root.Anchored = true end)
-	pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Track end)
-	-- Jeko-style smoothed logic
-	local MAX_SPEED = 85 * speed
-	local ACCEL = 0.04
-	local DECEL = 0.02
-	local TURN = 0.03
-	local ROT = 0.05
-	tflyVel = Vector3.new(0, 0, 0)
-	tflyMoveDir = Vector3.new(0, 0, 0)
-	tflyOrient = workspace.CurrentCamera.CFrame
-	tflyLastFlat = Vector3.new(tflyOrient.LookVector.X, 0, tflyOrient.LookVector.Z)
-	local ctrl = {F = 0, B = 0, L = 0, R = 0, U = 0, D = 0}
-	local function setKey(k, v)
-		if k == Enum.KeyCode.W then ctrl.F = v
-		elseif k == Enum.KeyCode.S then ctrl.B = v
-		elseif k == Enum.KeyCode.A then ctrl.L = v
-		elseif k == Enum.KeyCode.D then ctrl.R = v
-		elseif k == Enum.KeyCode.Space or k == Enum.KeyCode.E then ctrl.U = v
-		elseif k == Enum.KeyCode.Q or k == Enum.KeyCode.C then ctrl.D = v end
+end)
+
+addcmd('fly2speed',{'tflyspeed','fly2sp'},function(args, speaker)
+	local speed = tonumber(args[1])
+	if speed and speed >= 0 then
+		tfly.settings.speed = speed
 	end
-	tflyKeyDown = UserInputService.InputBegan:Connect(function(input, gp)
-		if gp then return end
-		setKey(input.KeyCode, 1)
-	end)
-	tflyKeyUp = UserInputService.InputEnded:Connect(function(input, gp)
-		if gp then return end
-		setKey(input.KeyCode, 0)
-	end)
-	tweenFlyConn = RunService.Heartbeat:Connect(function(dt)
-		if not FLYING then return end
-		root = getRoot(speaker.Character)
-		if not root then return end
-		if not root.Anchored then pcall(function() root.Anchored = true end) end
-		local curChar = speaker.Character
-		if tflyPartsChar ~= curChar then
-			tflyPartsChar = curChar
-			tflyParts = {}
-			for _, p in curChar:GetDescendants() do
-				if p:IsA("BasePart") then tflyParts[#tflyParts + 1] = p end
-			end
-		end
-		for _, p in ipairs(tflyParts) do
-			if p.CanCollide then p.CanCollide = false end
-		end
-		local curHum = curChar and curChar:FindFirstChildWhichIsA("Humanoid")
-		if curHum and not curHum.PlatformStand then curHum.PlatformStand = true end
-		local camCF = workspace.CurrentCamera.CFrame
-		-- frame-rate independent smoothing (constants are per 1/60s frame)
-		local kRot = 1 - (1 - ROT) ^ (dt * 60)
-		local kTurn = 1 - (1 - TURN) ^ (dt * 60)
-		local kAcc = 1 - (1 - ACCEL) ^ (dt * 60)
-		local kDec = 1 - (1 - DECEL) ^ (dt * 60)
-		tflyOrient = tflyOrient:Lerp(camCF, kRot)
-		local lv = tflyOrient.LookVector
-		local rv = tflyOrient.RightVector
-		local targetDir = Vector3.new(0, 0, 0)
-		if ctrl.F > 0 then targetDir = targetDir + lv end
-		if ctrl.B > 0 then targetDir = targetDir - lv end
-		if ctrl.L > 0 then targetDir = targetDir - rv end
-		if ctrl.R > 0 then targetDir = targetDir + rv end
-		if ctrl.U > 0 then targetDir = targetDir + Vector3.new(0, 1, 0) end
-		if ctrl.D > 0 then targetDir = targetDir - Vector3.new(0, 1, 0) end
-		tflyMoveDir = tflyMoveDir:Lerp(targetDir, kTurn)
-		local boost = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and 2.5 or 1
-		local targetVel = tflyMoveDir * (MAX_SPEED * boost)
-		if targetDir.Magnitude > 0 then
-			tflyVel = tflyVel:Lerp(targetVel, kAcc)
-		else
-			tflyVel = tflyVel:Lerp(Vector3.new(0, 0, 0), kDec)
-		end
-		local pos = root.CFrame.p + tflyVel * dt
-		local flat = Vector3.new(lv.X, 0, lv.Z)
-		if flat.Magnitude > 0.05 then tflyLastFlat = flat end
-		local targetCF = CFrame.lookAt(pos, pos + tflyLastFlat)
-		if tflyTween then pcall(function() tflyTween:Cancel() end) end
-		tflyTween = TweenService:Create(root, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {CFrame = targetCF})
-		tflyTween:Play()
-	end)
+end)
+
+addcmd('fly2smooth',{'tflysmooth'},function(args, speaker)
+	local value = tonumber(args[1])
+	if value then
+		tfly.settings.smoothRotation = value > 0
+		tfly.settings.rotationSmoothness = math.max(0, math.min(1, value))
+	end
+end)
+
+addcmd('fly2tiltmax',{'tflytiltmax'},function(args, speaker)
+	local value = tonumber(args[1])
+	if value then
+		tfly.settings.tiltMax = math.max(0, value)
+	end
+end)
+
+addcmd('fly2tiltinc',{'tflytiltinc'},function(args, speaker)
+	local value = tonumber(args[1])
+	if value then
+		tfly.settings.tiltInc = math.max(0.1, value)
+	end
 end)
 
 addcmd('vfly',{'vehiclefly'},function(args, speaker)
