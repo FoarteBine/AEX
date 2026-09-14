@@ -5710,7 +5710,6 @@ CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
 CMDs[#CMDs + 1] = {NAME = 'fly2 / tweenfly / tfly [speed]', DESC = 'Smooth fly (default speed is 100), Shift boosts it'}
-CMDs[#CMDs + 1] = {NAME = 'unfly2 / unfly', DESC = 'Disables fly2'}
 CMDs[#CMDs + 1] = {NAME = 'fly2speed / tflyspeed [num]', DESC = 'Set fly2 speed while flying'}
 CMDs[#CMDs + 1] = {NAME = 'fly2smooth / tflysmooth [0-1]', DESC = 'fly2 rotation smoothing (0 = instant, 1 = very smooth)'}
 CMDs[#CMDs + 1] = {NAME = 'fly2tiltmax / tflytiltmax [num]', DESC = 'fly2 maximum tilt angle (default is 25)'}
@@ -9680,16 +9679,25 @@ function startTweenFly(speed, speaker)
 	if not root then return end
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	FLYING = false
-	NOFLY()
+	pcall(NOFLY)
 	stopTweenFly()
 	pcall(function() unmobilefly(targ) end)
-	if flyKeyDown or flyKeyUp then
-		pcall(function() flyKeyDown:Disconnect() flyKeyUp:Disconnect() end)
+	if flyKeyDown then
+		pcall(function() flyKeyDown:Disconnect() end)
+		flyKeyDown = nil
+	end
+	if flyKeyUp then
+		pcall(function() flyKeyUp:Disconnect() end)
+		flyKeyUp = nil
 	end
 	tfly.player = targ
 	tfly.savedHum = {}
 	tfly.saveHumanoid(hum)
-	tfly.makeMovers(root)
+	if not pcall(tfly.makeMovers, root) or not tfly.isOn() then
+		tfly.player = nil
+		notify("fly2", "Could not create the flight parts")
+		return
+	end
 	if hum then
 		hum.PlatformStand = true
 		hum.AutoRotate = false
