@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.1"
+currentVersion = "0.1.2"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -729,7 +729,7 @@ SettingsHolder.BorderSizePixel = 0
 SettingsHolder.Size = UDim2.new(1,0,1,0)
 SettingsHolder.ScrollBarImageColor3 = Color3.fromRGB(78,78,79)
 SettingsHolder.BottomImage = ""
-SettingsHolder.CanvasSize = UDim2.new(0, 0, 0, 235)
+SettingsHolder.CanvasSize = UDim2.new(0, 0, 0, 265)
 SettingsHolder.MidImage = ""
 SettingsHolder.ScrollBarThickness = 4
 SettingsHolder.TopImage = ""
@@ -870,7 +870,7 @@ Positions.Name = "Waypoints"
 Positions.Parent = SettingsHolder
 
 EventBind = makeSettingsButton("Edit Event Binds",getcustomasset("aex/assets/bindsandplugins.png"),759)
-EventBind.Position = UDim2.new(0, 5, 0, 205)
+EventBind.Position = UDim2.new(0, 5, 0, 235)
 EventBind.Size = UDim2.new(1, -10, 0, 25)
 EventBind.Name = "EventBinds"
 EventBind.Parent = SettingsHolder
@@ -880,6 +880,13 @@ Plugins.Position = UDim2.new(0, 5, 0, 175)
 Plugins.Size = UDim2.new(1, -10, 0, 25)
 Plugins.Name = "Plugins"
 Plugins.Parent = SettingsHolder
+
+-- AEX: online plugin store entry (opens the Plugins Hub window, built lazily)
+PluginsHubBtn = makeSettingsButton("Plugins Hub",getcustomasset("aex/assets/imgstudiopluginlogo.png"))
+PluginsHubBtn.Position = UDim2.new(0, 5, 0, 205)
+PluginsHubBtn.Size = UDim2.new(1, -10, 0, 25)
+PluginsHubBtn.Name = "PluginsHub"
+PluginsHubBtn.Parent = SettingsHolder
 
 Example.Name = "Example"
 Example.Parent = Holder
@@ -1874,7 +1881,7 @@ PluginsHint.Position = UDim2.new(0, 25, 0, 40)
 PluginsHint.Size = UDim2.new(0, 200, 0, 50)
 PluginsHint.Font = Enum.Font.Gotham
 PluginsHint.TextSize = 16
-PluginsHint.Text = "Download plugins from the AEX Discord (discord.gg/geCDv2eqXV)"
+PluginsHint.Text = "Install plugins automatically with Plugins Hub"
 PluginsHint.TextColor3 = Color3.new(1, 1, 1)
 PluginsHint.TextStrokeColor3 = Color3.new(1, 1, 1)
 PluginsHint.TextWrapped = true
@@ -6083,6 +6090,7 @@ CMDs[#CMDs + 1] = {NAME = 'addplugin / plugin [name]', DESC = 'Add a plugin via 
 CMDs[#CMDs + 1] = {NAME = 'removeplugin / deleteplugin [name]', DESC = 'Remove a plugin via command'}
 CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
+CMDs[#CMDs + 1] = {NAME = 'hub / pluginhub', DESC = 'Opens the AEX Plugins Hub (online plugin store)'}
 
 -- AEX: full command reference window (toggled by the + button in the title bar)
 local refSectionTitles = {
@@ -7879,6 +7887,765 @@ Close_4.MouseButton1Click:Connect(function()
 	SettingsHolder.Visible = true
 	PluginsFrame:TweenPosition(UDim2.new(0, 0, 0, 175), "InOut", "Quart", 0.5, true, nil)
 end)
+
+-- // ===================== AEX Plugins Hub =====================
+-- Online plugin library. Catalogue: <repo>/plugins.json, files: <repo>/plugins/*.aex
+local AEX_HUB_RAW = "https://raw.githubusercontent.com/FoarteBine/AEXPluginsHub/refs/heads/main/"
+local AEX_HUB_INDEX = "plugins.json"
+local AEX_HUB_STATE_FILE = "aex_hub_state.json"
+local HUB_MUTED = Color3.fromRGB(150, 150, 156)
+local HUB_CARD = Color3.fromRGB(45, 45, 46)
+local HUB_GREEN = Color3.fromRGB(46, 170, 95)
+local HUB_AMBER = Color3.fromRGB(240, 160, 40)
+local HUB_TILE = {
+	Color3.fromRGB(99, 102, 241), Color3.fromRGB(34, 197, 94), Color3.fromRGB(236, 72, 153),
+	Color3.fromRGB(245, 158, 11), Color3.fromRGB(14, 165, 233), Color3.fromRGB(168, 85, 247),
+	Color3.fromRGB(20, 184, 166), Color3.fromRGB(239, 68, 68),
+}
+local hubFont = (function()
+	local ok, f = pcall(function() return Enum.Font[uiFont or "Gotham"] end)
+	if ok and f then return f end
+	return Enum.Font.Gotham
+end)()
+
+local hubGui, hubWin, hubList, hubListLayout, hubChipRow, hubSearch, hubStatusLbl
+local hubAll = {}
+local hubCat = "All"
+local hubQuery = ""
+local hubStateMap = {}
+local hubBusyId = {}
+local hubFetched = false
+local hubFetching = false
+local hubIconsDir = "aex/assets"
+
+function hubSetStatus(txt)
+	if hubStatusLbl then hubStatusLbl.Text = tostring(txt) end
+end
+
+function hubFetch(url)
+	local res
+	if httprequest then
+		local ok, out = pcall(function()
+			local r = httprequest({Url = url, Method = "GET"})
+			if type(r) == "table" then return r.Body end
+			return r
+		end)
+		if ok and type(out) == "string" then res = out end
+	end
+	if res == nil then
+		local ok, out = pcall(function() return game:HttpGet(url) end)
+		if ok and type(out) == "string" then res = out end
+	end
+	if type(res) == "string" then return res end
+	return nil
+end
+
+function hubBaseName(path)
+	local p = tostring(path or "")
+	return (p:match("([^/\\]+)$")) or "plugin.aex"
+end
+
+function hubSlug(s)
+	local out = tostring(s or ""):lower():gsub("[^%w]", "-")
+	out = out:gsub("%-+", "-")
+	out = out:gsub("^%-", "")
+	out = out:gsub("%-$", "")
+	if out == "" then out = "plugin" end
+	return out
+end
+
+function hubRawUrl(path)
+	if tostring(path):match("^https?://") then return tostring(path) end
+	return AEX_HUB_RAW .. tostring(path):gsub("^/+", "")
+end
+
+function hubLoadState()
+	hubStateMap = {}
+	pcall(function()
+		if readfile and isfile and isfile(AEX_HUB_STATE_FILE) then
+			local d = HttpService:JSONDecode(readfile(AEX_HUB_STATE_FILE))
+			if type(d) == "table" then hubStateMap = d end
+		end
+	end)
+end
+
+function hubSaveState()
+	pcall(function()
+		if writefile then writefile(AEX_HUB_STATE_FILE, HttpService:JSONEncode(hubStateMap), true) end
+	end)
+end
+
+function hubParseList(body)
+	local ok, dec = pcall(function() return HttpService:JSONDecode(body) end)
+	if not ok or type(dec) ~= "table" then return nil end
+	local arr = dec.Plugins or dec.plugins or dec.items or dec.Items or dec
+	if type(arr) ~= "table" then return nil end
+	local out = {}
+	for _, v in ipairs(arr) do
+		if type(v) == "table" then
+			local nm = v.Name or v.name
+			if type(nm) == "string" and nm ~= "" then
+				local e = {}
+				e.name = nm
+				e.id = tostring(v.Id or v.id or hubSlug(nm))
+				e.author = tostring(v.Author or v.author or v.Creator or "AEX community")
+				e.version = tostring(v.Version or v.version or "1.0")
+				e.desc = tostring(v.Desc or v.desc or v.Description or v.description or "")
+				e.cat = tostring(v.Category or v.category or v.Tag or "General")
+				local fl = v.File or v.file or v.Path or v.path
+				if type(fl) == "string" and fl ~= "" then e.file = fl else e.file = "plugins/" .. hubSlug(e.id) .. ".aex" end
+				local sv = v.SaveAs or v.saveAs
+				if type(sv) == "string" and sv ~= "" then e.saveas = sv else e.saveas = hubBaseName(e.file) end
+				if not e.saveas:match("%.aex$") and not e.saveas:match("%.iy$") then e.saveas = e.saveas .. ".aex" end
+				local ic = v.Icon or v.icon
+				e.icon = (type(ic) == "string" and ic) or ""
+				e.iconAsset = nil
+				table.insert(out, e)
+			end
+		end
+	end
+	return out
+end
+
+function hubTileColor(id)
+	local n = 0
+	local s = tostring(id)
+	for i = 1, #s do n = n + s:byte(i) * i end
+	return HUB_TILE[(n % #HUB_TILE) + 1]
+end
+
+function hubEntryState(e)
+	if hubBusyId[e.id] then return "busy" end
+	local onDisk = false
+	pcall(function() onDisk = (isfile ~= nil) and isfile(e.saveas) and true or false end)
+	local loaded = false
+	if onDisk then
+		pcall(function() loaded = (type(PluginsTable) == "table") and FindInTable(PluginsTable, e.saveas) and true or false end)
+	end
+	local want = tostring(e.version)
+	local have = hubStateMap[e.id]
+	if loaded then
+		if have and tostring(have) ~= want then return "update" end
+		return "installed"
+	end
+	if onDisk then return "downloaded" end
+	return "available"
+end
+
+function hubActionFor(st)
+	if st == "busy" then return "wait", HUB_MUTED end
+	if st == "installed" then return "Loaded", HUB_GREEN end
+	if st == "update" then return "Update", HUB_AMBER end
+	if st == "downloaded" then return "Load", AEX_ACCENT end
+	return "Install", AEX_ACCENT
+end
+
+function hubSetIcon(e, img)
+	if type(e.icon) ~= "string" or e.icon == "" then return end
+	task.spawn(function()
+		if e.iconAsset then
+			if img and img.Parent then img.Image = e.iconAsset img.Visible = true end
+			return
+		end
+		local asset
+		if e.icon:match("^rbxasset") then
+			asset = e.icon
+		else
+			local cached = hubIconsDir .. "/hub_" .. hubSlug(e.id) .. ".png"
+			local okF, isF = pcall(function() return (isfile ~= nil) and isfile(cached) end)
+			if okF and isF then
+				asset = getcustomasset(cached)
+			else
+				local data = hubFetch(hubRawUrl(e.icon))
+				local usable = false
+				if type(data) == "string" and #data > 12 then
+					if data:sub(1, 4) == "\137PNG" or data:sub(1, 3) == "\255\216\255" or data:sub(1, 4) == "GIF8" or data:sub(1, 2) == "\066\077" then
+						usable = true
+					end
+				end
+				if usable then
+					pcall(function()
+						if makefolder and isfolder and not isfolder(hubIconsDir) then makefolder(hubIconsDir) end
+						writefile(cached, data)
+					end)
+					asset = getcustomasset(cached)
+				end
+			end
+		end
+		if type(asset) == "string" and asset ~= "" then
+			e.iconAsset = asset
+			if img and img.Parent then
+				img.Image = asset
+				img.Visible = true
+			end
+		end
+	end)
+end
+
+function hubMakeCard(e, order)
+	local card = Instance.new("Frame")
+	card.Name = "HUBCARD_" .. e.id
+	card.Parent = hubList
+	card.Size = UDim2.new(1, 0, 0, 74)
+	card.BackgroundColor3 = HUB_CARD
+	card.BorderSizePixel = 0
+	card.LayoutOrder = order
+	card.ZIndex = 11
+	pcall(aexRound, card, 9)
+
+	local tile = Instance.new("Frame")
+	tile.Parent = card
+	tile.Position = UDim2.new(0, 10, 0, 12)
+	tile.Size = UDim2.new(0, 50, 0, 50)
+	tile.BackgroundColor3 = hubTileColor(e.id)
+	tile.BorderSizePixel = 0
+	tile.ZIndex = 12
+	pcall(aexRound, tile, 9)
+
+	local letter = Instance.new("TextLabel")
+	letter.Parent = tile
+	letter.BackgroundTransparency = 1
+	letter.Size = UDim2.new(1, 0, 1, 0)
+	letter.Font = Enum.Font.GothamBold
+	letter.TextSize = 22
+	letter.TextColor3 = Color3.new(1, 1, 1)
+	letter.Text = string.upper(string.sub(e.name, 1, 1))
+	letter.ZIndex = 13
+
+	local img = Instance.new("ImageLabel")
+	img.Parent = tile
+	img.BackgroundTransparency = 1
+	img.Size = UDim2.new(1, 0, 1, 0)
+	img.Image = ""
+	img.Visible = false
+	img.ScaleType = Enum.ScaleType.Fit
+	img.ZIndex = 14
+	pcall(aexRound, img, 9)
+	hubSetIcon(e, img)
+
+	local nm = Instance.new("TextLabel")
+	nm.Parent = card
+	nm.BackgroundTransparency = 1
+	nm.Position = UDim2.new(0, 70, 0, 9)
+	nm.Size = UDim2.new(1, -116, 0, 18)
+	nm.Font = Enum.Font.GothamBold
+	nm.TextSize = 15
+	nm.TextXAlignment = Enum.TextXAlignment.Left
+	nm.TextTruncate = Enum.TextTruncate.AtEnd
+	nm.TextColor3 = Color3.new(1, 1, 1)
+	nm.Text = e.name
+	nm.ZIndex = 12
+
+	local meta = Instance.new("TextLabel")
+	meta.Parent = card
+	meta.BackgroundTransparency = 1
+	meta.Position = UDim2.new(0, 70, 0, 27)
+	meta.Size = UDim2.new(1, -116, 0, 13)
+	meta.Font = hubFont
+	meta.TextSize = 11
+	meta.TextXAlignment = Enum.TextXAlignment.Left
+	meta.TextTruncate = Enum.TextTruncate.AtEnd
+	meta.TextColor3 = HUB_MUTED
+	meta.Text = "by " .. e.author .. "   ·   " .. e.cat
+	meta.ZIndex = 12
+
+	local ds = Instance.new("TextLabel")
+	ds.Parent = card
+	ds.BackgroundTransparency = 1
+	ds.Position = UDim2.new(0, 70, 0, 41)
+	ds.Size = UDim2.new(1, -116, 0, 28)
+	ds.Font = hubFont
+	ds.TextSize = 12
+	ds.TextXAlignment = Enum.TextXAlignment.Left
+	ds.TextYAlignment = Enum.TextYAlignment.Top
+	ds.TextWrapped = true
+	ds.TextColor3 = Color3.fromRGB(200, 200, 205)
+	ds.Text = e.desc
+	ds.ZIndex = 12
+
+	local ver = Instance.new("TextLabel")
+	ver.Parent = card
+	ver.BackgroundTransparency = 1
+	ver.Position = UDim2.new(1, -96, 0, 8)
+	ver.Size = UDim2.new(0, 86, 0, 12)
+	ver.Font = hubFont
+	ver.TextSize = 10
+	ver.TextColor3 = HUB_MUTED
+	ver.Text = "v" .. e.version
+	ver.ZIndex = 12
+
+	local btn = Instance.new("TextButton")
+	btn.Parent = card
+	btn.Name = "HubAction"
+	btn.Position = UDim2.new(1, -96, 0, 23)
+	btn.Size = UDim2.new(0, 86, 0, 28)
+	btn.BackgroundColor3 = AEX_ACCENT
+	btn.BorderSizePixel = 0
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 13
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.AutoButtonColor = false
+	btn.Text = "Install"
+	btn.ZIndex = 13
+	pcall(aexRound, btn, 7)
+	aexHover(btn)
+
+	local rem = Instance.new("TextButton")
+	rem.Parent = card
+	rem.Name = "HubRemove"
+	rem.BackgroundTransparency = 1
+	rem.Position = UDim2.new(1, -96, 0, 54)
+	rem.Size = UDim2.new(0, 86, 0, 14)
+	rem.Font = hubFont
+	rem.TextSize = 10
+	rem.TextColor3 = HUB_MUTED
+	rem.Text = "remove"
+	rem.AutoButtonColor = false
+	rem.Visible = false
+	rem.ZIndex = 13
+
+	local st = hubEntryState(e)
+	local lbl, col = hubActionFor(st)
+	btn.Text = lbl
+	btn.BackgroundColor3 = col
+	rem.Visible = (st == "installed" or st == "downloaded" or st == "update")
+
+	btn.MouseButton1Click:Connect(function()
+		local cur = hubEntryState(e)
+		if cur == "busy" then return end
+		if cur == "available" or cur == "update" or cur == "installed" then
+			hubInstall(e)
+		elseif cur == "downloaded" then
+			hubActivate(e)
+		end
+	end)
+	rem.MouseButton1Click:Connect(function()
+		hubRemove(e)
+	end)
+	return card
+end
+
+function hubMatches(e)
+	if hubCat ~= "All" and e.cat ~= hubCat then return false end
+	if hubQuery ~= "" then
+		local q = hubQuery
+		local hay = string.lower(e.name .. " " .. e.author .. " " .. e.desc .. " " .. e.id)
+		if not hay:find(q, 1, true) then return false end
+	end
+	return true
+end
+
+function hubBuildList()
+	if not hubList then return end
+	for _, c in ipairs(hubList:GetChildren()) do
+		if c ~= hubListLayout then c:Destroy() end
+	end
+	local shown, total, inst = 0, 0, 0
+	for _, e in ipairs(hubAll) do
+		total = total + 1
+		local st = hubEntryState(e)
+		if st == "installed" then inst = inst + 1 end
+		if hubMatches(e) then
+			shown = shown + 1
+			hubMakeCard(e, shown)
+		end
+	end
+	if not hubFetched then
+		return
+	end
+	if total == 0 then
+		hubSetStatus("the hub has no plugins yet")
+	elseif shown == 0 then
+		hubSetStatus("no plugins match your search (" .. total .. " in hub, " .. inst .. " installed)")
+	else
+		hubSetStatus(shown .. " of " .. total .. " plugins   ·   " .. inst .. " installed")
+	end
+end
+
+function hubBuildChips()
+	if not hubChipRow then return end
+	for _, c in ipairs(hubChipRow:GetChildren()) do
+		if c:IsA("TextButton") then c:Destroy() end
+	end
+	local cats = { "All" }
+	for _, e in ipairs(hubAll) do
+		local dup = false
+		for _, c in ipairs(cats) do
+			if c == e.cat then dup = true end
+		end
+		if not dup then table.insert(cats, e.cat) end
+	end
+	for i, c in ipairs(cats) do
+		local chip = Instance.new("TextButton")
+		chip.Parent = hubChipRow
+		chip.LayoutOrder = i
+		chip.Size = UDim2.new(0, math.max(38, 12 + #c * 7), 0, 20)
+		chip.BackgroundColor3 = (c == hubCat) and AEX_ACCENT or Color3.fromRGB(52, 52, 55)
+		chip.BorderSizePixel = 0
+		chip.Font = hubFont
+		chip.TextSize = 11
+		chip.TextColor3 = Color3.new(1, 1, 1)
+		chip.AutoButtonColor = false
+		chip.Text = c
+		chip.ZIndex = 12
+		pcall(aexRound, chip, 5)
+		aexHover(chip)
+		chip.MouseButton1Click:Connect(function()
+			hubCat = c
+			hubBuildChips()
+			hubBuildList()
+		end)
+	end
+end
+
+function hubInstall(e)
+	if hubBusyId[e.id] then return end
+	if not writefileExploit() then
+		notify("Incompatible Exploit", "Your exploit cannot save files, so plugins cannot be installed")
+		return
+	end
+	hubBusyId[e.id] = true
+	hubSetStatus("downloading " .. e.name .. "...")
+	hubBuildList()
+	task.spawn(function()
+		local body = hubFetch(hubRawUrl(e.file))
+		local usable = false
+		if type(body) == "string" and #body > 4 then
+			if not body:match("^404") and not body:match("^%s*<!DOCTYPE") and not body:match("^%s*<html") then
+				usable = true
+			end
+		end
+		if not usable then
+			hubBusyId[e.id] = nil
+			hubSetStatus("could not download " .. e.name)
+			hubBuildList()
+			return
+		end
+		local okW = pcall(function() writefile(e.saveas, body) end)
+		if not okW then
+			hubBusyId[e.id] = nil
+			hubSetStatus("could not save " .. e.saveas)
+			hubBuildList()
+			return
+		end
+		hubStateMap[e.id] = tostring(e.version)
+		hubSaveState()
+		local already = (type(PluginsTable) == "table") and FindInTable(PluginsTable, e.saveas) and true or false
+		if already then
+			pcall(function() deletePlugin(e.saveas) end)
+			task.wait(0.4)
+		end
+		pcall(function() addPlugin(e.saveas) end)
+		hubBusyId[e.id] = nil
+		hubSetStatus(e.name .. " v" .. e.version .. " installed")
+		hubBuildList()
+	end)
+end
+
+function hubActivate(e)
+	if hubBusyId[e.id] then return end
+	hubBusyId[e.id] = true
+	hubBuildList()
+	task.spawn(function()
+		pcall(function() addPlugin(e.saveas) end)
+		hubBusyId[e.id] = nil
+		hubSetStatus(e.name .. " loaded")
+		hubBuildList()
+	end)
+end
+
+function hubRemove(e)
+	if hubBusyId[e.id] then return end
+	hubBusyId[e.id] = true
+	hubBuildList()
+	task.spawn(function()
+		pcall(function() deletePlugin(e.saveas) end)
+		pcall(function()
+			if delfile and isfile and isfile(e.saveas) then delfile(e.saveas) end
+		end)
+		hubStateMap[e.id] = nil
+		hubSaveState()
+		hubBusyId[e.id] = nil
+		hubSetStatus(e.name .. " removed")
+		hubBuildList()
+	end)
+end
+
+function hubLoadIndex(force)
+	if hubFetching then return end
+	hubFetching = true
+	hubLoadState()
+	hubSetStatus("loading plugin list...")
+	task.spawn(function()
+		local url = AEX_HUB_RAW .. AEX_HUB_INDEX
+		if force or hubFetched then
+			url = url .. "?cb=" .. tostring(os.time())
+		end
+		local body = hubFetch(url)
+		hubFetching = false
+		if type(body) ~= "string" then
+			hubSetStatus("could not reach the hub - check your connection")
+			if hubStatusLbl then hubStatusLbl.TextColor3 = Color3.fromRGB(240, 110, 110) end
+			return
+		end
+		local list = hubParseList(body)
+		if list == nil then
+			hubSetStatus("could not read plugins.json")
+			if hubStatusLbl then hubStatusLbl.TextColor3 = Color3.fromRGB(240, 110, 110) end
+			return
+		end
+		hubAll = list
+		hubFetched = true
+		if hubStatusLbl then hubStatusLbl.TextColor3 = HUB_MUTED end
+		hubBuildChips()
+		hubBuildList()
+	end)
+end
+
+function buildPluginsHub()
+	local parentGui
+	if gethui then pcall(function() parentGui = gethui() end) end
+	if not parentGui then parentGui = COREGUI end
+	hubGui = Instance.new("ScreenGui")
+	hubGui.Name = "AEXPluginsHub"
+	hubGui.ResetOnSpawn = false
+	hubGui.IgnoreGuiInset = true
+	hubGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	hubGui.DisplayOrder = 9
+	hubGui.Enabled = false
+	hubGui.Parent = parentGui
+
+	local vp = workspace.CurrentCamera.ViewportSize
+	local wW = math.max(340, math.min(vp.X - 24, math.clamp(vp.X * 0.62, 520, 880)))
+	local wH = math.max(300, math.min(vp.Y - 44, math.clamp(vp.Y * 0.74, 360, 660)))
+	hubWin = Instance.new("Frame")
+	hubWin.Name = "HubWindow"
+	hubWin.Parent = hubGui
+	hubWin.AnchorPoint = Vector2.new(0.5, 0.5)
+	hubWin.Position = UDim2.new(0.5, 0, 0.5, 0)
+	hubWin.Size = UDim2.new(0, wW, 0, wH)
+	hubWin.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
+	hubWin.BorderSizePixel = 0
+	hubWin.Active = true
+	hubWin.ZIndex = 10
+	pcall(aexRound, hubWin, 12)
+	aexStroke(hubWin, 0.4)
+
+	local head = Instance.new("Frame")
+	head.Name = "HubHead"
+	head.Parent = hubWin
+	head.Position = UDim2.new(0, 0, 0, 0)
+	head.Size = UDim2.new(1, 0, 0, 46)
+	head.BackgroundColor3 = Color3.fromRGB(43, 43, 46)
+	head.BorderSizePixel = 0
+	head.Active = true
+	head.ZIndex = 11
+	pcall(aexRound, head, 12, "top")
+
+	local accent = Instance.new("Frame")
+	accent.Parent = head
+	accent.Position = UDim2.new(0, 0, 1, -2)
+	accent.Size = UDim2.new(1, 0, 0, 2)
+	accent.BackgroundColor3 = AEX_ACCENT
+	accent.BorderSizePixel = 0
+	accent.ZIndex = 12
+
+	local ttl = Instance.new("TextLabel")
+	ttl.Parent = head
+	ttl.BackgroundTransparency = 1
+	ttl.Position = UDim2.new(0, 12, 0, 6)
+	ttl.Size = UDim2.new(0.5, 0, 0, 20)
+	ttl.Font = Enum.Font.GothamBold
+	ttl.TextSize = 17
+	ttl.TextXAlignment = Enum.TextXAlignment.Left
+	ttl.TextColor3 = Color3.new(1, 1, 1)
+	ttl.Text = "Plugins Hub"
+	ttl.ZIndex = 12
+
+	local sub = Instance.new("TextLabel")
+	sub.Parent = head
+	sub.BackgroundTransparency = 1
+	sub.Position = UDim2.new(0, 12, 0, 26)
+	sub.Size = UDim2.new(0.55, 0, 0, 14)
+	sub.Font = hubFont
+	sub.TextSize = 11
+	sub.TextXAlignment = Enum.TextXAlignment.Left
+	sub.TextColor3 = HUB_MUTED
+	sub.Text = "AEX online plugin library - install with one click"
+	sub.ZIndex = 12
+
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Parent = head
+	closeBtn.Position = UDim2.new(1, -32, 0, 12)
+	closeBtn.Size = UDim2.new(0, 22, 0, 22)
+	closeBtn.BackgroundTransparency = 1
+	closeBtn.Font = Enum.Font.GothamBold
+	closeBtn.TextSize = 14
+	closeBtn.TextColor3 = Color3.new(1, 1, 1)
+	closeBtn.AutoButtonColor = false
+	closeBtn.Text = "X"
+	closeBtn.ZIndex = 12
+	aexHover(closeBtn)
+	closeBtn.MouseButton1Click:Connect(function()
+		if hubGui then hubGui.Enabled = false end
+	end)
+
+	local refreshBtn = Instance.new("TextButton")
+	refreshBtn.Parent = head
+	refreshBtn.Position = UDim2.new(1, -104, 0, 13)
+	refreshBtn.Size = UDim2.new(0, 64, 0, 20)
+	refreshBtn.BackgroundColor3 = Color3.fromRGB(56, 56, 60)
+	refreshBtn.BorderSizePixel = 0
+	refreshBtn.Font = hubFont
+	refreshBtn.TextSize = 11
+	refreshBtn.TextColor3 = Color3.new(1, 1, 1)
+	refreshBtn.AutoButtonColor = false
+	refreshBtn.Text = "Refresh"
+	refreshBtn.ZIndex = 12
+	pcall(aexRound, refreshBtn, 5)
+	aexHover(refreshBtn)
+	refreshBtn.MouseButton1Click:Connect(function()
+		hubLoadIndex(true)
+	end)
+
+	hubSearch = Instance.new("TextBox")
+	hubSearch.Parent = hubWin
+	hubSearch.Position = UDim2.new(0, 10, 0, 52)
+	hubSearch.Size = UDim2.new(1, -20, 0, 26)
+	hubSearch.BackgroundColor3 = Color3.fromRGB(43, 43, 46)
+	hubSearch.BorderSizePixel = 0
+	hubSearch.Font = hubFont
+	hubSearch.TextSize = 13
+	hubSearch.TextXAlignment = Enum.TextXAlignment.Left
+	hubSearch.TextColor3 = Color3.new(1, 1, 1)
+	hubSearch.PlaceholderText = "Search plugins, authors..."
+	hubSearch.PlaceholderColor3 = HUB_MUTED
+	hubSearch.Text = ""
+	hubSearch.ClearTextOnFocus = false
+	hubSearch.ZIndex = 11
+	pcall(aexRound, hubSearch, 6)
+	aexStroke(hubSearch, 0.5)
+	hubSearch:GetPropertyChangedSignal("Text"):Connect(function()
+		hubQuery = string.lower(hubSearch.Text)
+		hubBuildList()
+	end)
+
+	hubChipRow = Instance.new("Frame")
+	hubChipRow.Parent = hubWin
+	hubChipRow.Position = UDim2.new(0, 10, 0, 84)
+	hubChipRow.Size = UDim2.new(1, -20, 0, 20)
+	hubChipRow.BackgroundTransparency = 1
+	hubChipRow.ZIndex = 11
+	local chipLayout = Instance.new("UIListLayout")
+	chipLayout.Parent = hubChipRow
+	chipLayout.FillDirection = Enum.FillDirection.Horizontal
+	chipLayout.Padding = UDim.new(0, 5)
+	chipLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	hubList = Instance.new("ScrollingFrame")
+	hubList.Parent = hubWin
+	hubList.Position = UDim2.new(0, 10, 0, 110)
+	hubList.Size = UDim2.new(1, -20, 1, -146)
+	hubList.BackgroundTransparency = 1
+	hubList.BorderSizePixel = 0
+	hubList.ScrollBarImageColor3 = Color3.fromRGB(78, 78, 79)
+	hubList.ScrollBarThickness = 5
+	hubList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	hubList.CanvasSize = UDim2.new(0, 0, 0, 0)
+	hubList.BottomImage = ""
+	hubList.MidImage = ""
+	hubList.TopImage = ""
+	hubList.VerticalScrollBarInset = Enum.VerticalScrollBarInset.Scrollbar
+	hubList.ZIndex = 11
+	hubListLayout = Instance.new("UIListLayout")
+	hubListLayout.Parent = hubList
+	hubListLayout.Padding = UDim.new(0, 6)
+	hubListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	hubStatusLbl = Instance.new("TextLabel")
+	hubStatusLbl.Parent = hubWin
+	hubStatusLbl.BackgroundTransparency = 1
+	hubStatusLbl.Position = UDim2.new(0, 12, 1, -24)
+	hubStatusLbl.Size = UDim2.new(1, -150, 0, 16)
+	hubStatusLbl.Font = hubFont
+	hubStatusLbl.TextSize = 11
+	hubStatusLbl.TextXAlignment = Enum.TextXAlignment.Left
+	hubStatusLbl.TextColor3 = HUB_MUTED
+	hubStatusLbl.Text = "connecting to the hub..."
+	hubStatusLbl.TextTruncate = Enum.TextTruncate.AtEnd
+	hubStatusLbl.ZIndex = 11
+
+	local copyBtn = Instance.new("TextButton")
+	copyBtn.Parent = hubWin
+	copyBtn.Position = UDim2.new(1, -130, 1, -26)
+	copyBtn.Size = UDim2.new(0, 120, 0, 20)
+	copyBtn.BackgroundColor3 = Color3.fromRGB(43, 43, 46)
+	copyBtn.BorderSizePixel = 0
+	copyBtn.Font = hubFont
+	copyBtn.TextSize = 11
+	copyBtn.TextColor3 = HUB_MUTED
+	copyBtn.AutoButtonColor = false
+	copyBtn.Text = "copy hub link"
+	copyBtn.ZIndex = 11
+	pcall(aexRound, copyBtn, 5)
+	aexHover(copyBtn)
+	copyBtn.MouseButton1Click:Connect(function()
+		hubSetStatus("link copied - share the Plugins Hub repo")
+		toClipboard("https://github.com/FoarteBine/AEXPluginsHub")
+	end)
+
+	-- drag by header
+	local dragging, dragStart, dragBase
+	head.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			dragBase = hubWin.Position
+		end
+	end)
+	head.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if not dragging then return end
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			local d = input.Position - dragStart
+			hubWin.Position = UDim2.new(dragBase.X.Scale, dragBase.X.Offset + d.X, dragBase.Y.Scale, dragBase.Y.Offset + d.Y)
+		end
+	end)
+end
+
+function togglePluginsHub()
+	if not hubGui then buildPluginsHub() end
+	if not hubGui then return end
+	hubGui.Enabled = not hubGui.Enabled
+	if hubGui.Enabled then
+		if hubFetched then
+			hubBuildChips()
+			hubBuildList()
+		else
+			hubLoadIndex(false)
+		end
+	end
+end
+
+PluginsHubBtn.MouseButton1Click:Connect(function()
+	togglePluginsHub()
+end)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if hubGui and hubGui.Enabled and input.KeyCode == Enum.KeyCode.Escape then
+		hubGui.Enabled = false
+	end
+end)
+
+addcmd('hub', {'pluginhub'}, function(args, speaker)
+	togglePluginsHub()
+end)
+-- // ===================== AEX Plugins Hub =====================
 
 local TeleportCheck = false
 Players.LocalPlayer.OnTeleport:Connect(function(State)
