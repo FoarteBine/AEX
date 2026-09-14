@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.3"
+currentVersion = "0.1.4"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -5640,6 +5640,7 @@ end
 
 CMDs = {}
 CMDs[#CMDs + 1] = {NAME = 'discord / support / help', DESC = 'Invite to the AEX discord server.'}
+CMDs[#CMDs + 1] = {NAME = 'cmdhint / suggest [on/off]', DESC = 'Toggles the grey command hint in the command bar. TAB or RIGHT accepts it, tapping the hint works on mobile.'}
 CMDs[#CMDs + 1] = {NAME = 'guiscale [number]', DESC = 'Changes the size of the gui. [number] accepts decimals and whole numbers. Min is 0.4 and Max is 2'}
 CMDs[#CMDs + 1] = {NAME = 'console', DESC = 'Opens the Roblox console'}
 CMDs[#CMDs + 1] = {NAME = 'oldconsole', DESC = 'Loads an old-themed Roblox console'}
@@ -7064,6 +7065,157 @@ Cmdbar:GetPropertyChangedSignal("Text"):Connect(function()
 	end
 end)
 
+-- // inline command hints: gray ghost text after what is typed in the command bar
+local cmdHint
+local cmdHintSuggestion = nil
+local cmdHintKeep = ""
+local cmdHintStale = true
+cmdHintsOn = true
+
+function cmdHintTyped()
+	local text = Cmdbar.Text
+	local subPos = 0
+	local pos = 1
+	local findRes = string.find(text, "\\", pos)
+	while findRes do
+		subPos = findRes
+		pos = findRes + 1
+		findRes = string.find(text, "\\", pos)
+	end
+	local typed = text:sub(subPos + 1)
+	if typed:sub(1, 1) == "!" then typed = typed:sub(2) end
+	if #prefix > 0 and typed:sub(1, #prefix) == prefix then typed = typed:sub(#prefix + 1) end
+	return typed
+end
+
+function cmdHintGet()
+	local typed = cmdHintTyped()
+	if typed == "" then return nil end
+	local low = string.lower(typed)
+	local function startsWith(str)
+		return type(str) == "string" and string.lower(str):sub(1, #low) == low
+	end
+	-- user aliases first, then command aliases, then command names
+	if type(aliases) == "table" then
+		for _, entry in ipairs(aliases) do
+			if type(entry) == "table" and startsWith(entry.ALIAS) then return entry.ALIAS end
+		end
+	end
+	for _, entry in ipairs(cmds) do
+		if type(entry.NAME) == "string" then
+			for _, alias in ipairs(entry.ALIAS or {}) do
+				if startsWith(alias) then return entry.NAME end
+			end
+		end
+	end
+	for _, entry in ipairs(cmds) do
+		if startsWith(entry.NAME) then return entry.NAME end
+	end
+	return nil
+end
+
+function updateCmdHint()
+	if not cmdHint or not cmdHint.Parent then return end
+	local shown = false
+	pcall(function()
+		if not cmdHintsOn then return end
+		if not Cmdbar:IsFocused() then return end
+		local text = Cmdbar.Text
+		if text == "" then return end
+		local caret = Cmdbar.CursorPosition
+		if caret ~= -1 and caret ~= #text + 1 then return end
+		local typed = cmdHintTyped()
+		if typed == "" then return end
+		local suggestion = cmdHintGet()
+		if not suggestion then return end
+		local remainder = suggestion:sub(#typed + 1)
+		if remainder == "" then return end
+		local textSize = TextService:GetTextSize(text, Cmdbar.TextSize, Cmdbar.Font, Vector2.new(999999, 9999))
+		local hintText = remainder .. "   (" .. (IsOnMobile and "TAP" or "TAB") .. ")"
+		local hintSize = TextService:GetTextSize(hintText, Cmdbar.TextSize, Cmdbar.Font, Vector2.new(999999, 9999))
+		cmdHint.Font = Cmdbar.Font
+		cmdHint.TextSize = Cmdbar.TextSize
+		cmdHint.TextColor3 = Cmdbar.TextColor3:Lerp(Color3.fromRGB(110, 110, 115), 0.55)
+		cmdHint.Text = hintText
+		cmdHint.Size = UDim2.new(0, hintSize.X + 4, 1, 0)
+		cmdHint.Position = UDim2.new(0, Cmdbar.Position.X.Offset + textSize.X + 2, 0, 0)
+		cmdHint.Visible = true
+		cmdHintSuggestion = suggestion
+		cmdHintKeep = text:sub(1, #text - #typed)
+		cmdHintStale = false
+		shown = true
+	end)
+	if not shown then
+		cmdHintSuggestion = nil
+		cmdHint.Visible = false
+	end
+end
+
+function acceptCmdHint(onlyRightKey)
+	if not cmdHintsOn or not cmdHintSuggestion or cmdHintStale then return false end
+	if not Cmdbar:IsFocused() then return false end
+	if onlyRightKey then
+		local text = Cmdbar.Text
+		local caret = Cmdbar.CursorPosition
+		if caret ~= -1 and caret ~= #text + 1 then return false end
+	end
+	local suggestion = cmdHintSuggestion
+	autoComplete(suggestion)
+	cmdHintSuggestion = nil
+	updateCmdHint()
+	return true
+end
+
+cmdHint = Instance.new("TextButton")
+cmdHint.Name = "CmdHint"
+cmdHint.AutoButtonColor = false
+cmdHint.Active = true
+cmdHint.BackgroundTransparency = 1
+cmdHint.Text = ""
+cmdHint.Font = Cmdbar.Font
+cmdHint.TextSize = Cmdbar.TextSize
+cmdHint.TextXAlignment = Enum.TextXAlignment.Left
+cmdHint.ZIndex = (Cmdbar.ZIndex or 10) + 1
+cmdHint.Size = UDim2.new(0, 120, 1, 0)
+cmdHint.Position = UDim2.new(0, 4, 0, 0)
+cmdHint.Visible = false
+cmdHint.Parent = Cmdbar.Parent
+pcall(function() cmdHint.Selectable = false end)
+-- tapping the ghost text completes the command (there is no TAB key on phones)
+cmdHint.MouseButton1Click:Connect(function()
+	if not cmdHintsOn or not cmdHintSuggestion then return end
+	local text = cmdHintKeep .. cmdHintSuggestion .. " "
+	cmdHintSuggestion = nil
+	cmdHintStale = true
+	Cmdbar:CaptureFocus()
+	Cmdbar.Text = text
+	pcall(function() Cmdbar.CursorPosition = #text + 1 end)
+	updateCmdHint()
+end)
+
+Cmdbar:GetPropertyChangedSignal("Text"):Connect(updateCmdHint)
+Cmdbar:GetPropertyChangedSignal("CursorPosition"):Connect(updateCmdHint)
+Cmdbar.Focused:Connect(function()
+	task.defer(updateCmdHint)
+end)
+Cmdbar.FocusLost:Connect(function()
+	cmdHintStale = true
+	if cmdHint then cmdHint.Visible = false end
+end)
+
+addcmd('cmdhint',{'suggest','suggestion','cmdbarsuggest'},function(args, speaker)
+	local state = string.lower(tostring(args[1] or ""))
+	if state == "on" or state == "true" or state == "1" or state == "enable" then
+		cmdHintsOn = true
+	elseif state == "off" or state == "false" or state == "0" or state == "disable" then
+		cmdHintsOn = false
+	else
+		cmdHintsOn = not cmdHintsOn
+	end
+	updateCmdHint()
+	notify('Command hints', cmdHintsOn and "Enabled - type in the command bar and press TAB or RIGHT to accept the grey suggestion." or "Disabled - the grey command suggestion is hidden.", 5)
+end)
+
 local tabComplete = nil
 tabAllowed = true
 Cmdbar.FocusLost:Connect(function(enterpressed)
@@ -7095,8 +7247,11 @@ Cmdbar.Focused:Connect(function()
 	end
 	tabComplete = UserInputService.InputBegan:Connect(function(input,gameProcessed)
 		if Cmdbar:IsFocused() then
-			if tabAllowed == true and input.KeyCode == Enum.KeyCode.Tab and topCommand ~= nil then
-				autoComplete(topCommand)
+			if tabAllowed == true and (input.KeyCode == Enum.KeyCode.Tab or input.KeyCode == Enum.KeyCode.Right) then
+				local isRight = input.KeyCode == Enum.KeyCode.Right
+				if not acceptCmdHint(isRight) and not isRight and topCommand ~= nil then
+					autoComplete(topCommand)
+				end
 			end
 		else
 			tabComplete:Disconnect()
