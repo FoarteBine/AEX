@@ -8308,7 +8308,9 @@ function hubInstall(e)
 	hubSetStatus("downloading " .. e.name .. "...")
 	hubBuildList()
 	task.spawn(function()
-		local body = hubFetch(hubRawUrl(e.file))
+		local url = hubRawUrl(e.file)
+		url = url .. ((url:match("%?") and "&") or "?") .. "cb=" .. tostring(os.time())
+		local body = hubFetch(url)
 		local usable = false
 		if type(body) == "string" and #body > 4 then
 			if not body:match("^404") and not body:match("^%s*<!DOCTYPE") and not body:match("^%s*<html") then
