@@ -6063,6 +6063,11 @@ CMDs[#CMDs + 1] = {NAME = 'unautokeypress', DESC = 'Stops autokeypress'}
 CMDs[#CMDs + 1] = {NAME = 'hovername', DESC = 'Shows a players username when your mouse is hovered over them'}
 CMDs[#CMDs + 1] = {NAME = 'unhovername / nohovername', DESC = 'Turns off hovername'}
 CMDs[#CMDs + 1] = {NAME = 'mousesensitivity / ms [0-10]', DESC = 'Sets your mouse sensitivity (affects first person and right click drag) (default is 1)'}
+CMDs[#CMDs + 1] = {NAME = 'showcursor / showmouse / mouse', DESC = 'Makes the mouse cursor visible'}
+CMDs[#CMDs + 1] = {NAME = 'unlockcursor / unlockmouse / umouse', DESC = 'Unlocks the mouse cursor (and makes it visible)'}
+CMDs[#CMDs + 1] = {NAME = 'lockcursor / centercursor', DESC = 'Locks the mouse cursor to the center of the screen'}
+CMDs[#CMDs + 1] = {NAME = 'defaultcursor / dcursor', DESC = 'Forces the Roblox default cursor (unlocks it and clears the cursor icon)'}
+CMDs[#CMDs + 1] = {NAME = 'gamecursor / gcursor', DESC = 'Reverts AEX cursor changes back to what the game had'}
 CMDs[#CMDs + 1] = {NAME = 'clickdelete', DESC = 'Go to Settings > Keybinds > Add for click delete'}
 CMDs[#CMDs + 1] = {NAME = 'clickteleport', DESC = 'Go to Settings > Keybinds > Add for click teleport'}
 CMDs[#CMDs + 1] = {NAME = 'mouseteleport / mousetp', DESC = 'Teleports your character to your mouse. This is recommended as a keybind'}
@@ -15239,6 +15244,69 @@ end)
 
 addcmd('mousesensitivity',{'ms'},function(args, speaker)
 	UserInputService.MouseDeltaSensitivity = args[1]
+end)
+
+-- // mouse cursor tools
+local mouseDefaults = {}
+local function mouseKeep(prop)
+	if mouseDefaults[prop] == nil then
+		mouseDefaults[prop] = UserInputService[prop]
+	end
+end
+local function mouseShowCursor()
+	mouseKeep("MouseIconEnabled")
+	UserInputService.MouseIconEnabled = true
+end
+local function mouseUnlockCursor()
+	mouseShowCursor()
+	mouseKeep("MouseBehavior")
+	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+end
+function mouseRestoreGameCursor()
+	for prop, val in pairs(mouseDefaults) do
+		UserInputService[prop] = val
+	end
+	for prop in next, mouseDefaults do
+		mouseDefaults[prop] = nil
+	end
+end
+
+addcmd('showcursor',{'showmouse','mouse','cursoron'},function(args, speaker)
+	mouseShowCursor()
+	if args[1] ~= "nonotify" then
+		notify('Mouse Visible','The mouse cursor is now visible',5)
+	end
+end)
+
+addcmd('unlockcursor',{'unlockmouse','umouse','ucur','unlockcur'},function(args, speaker)
+	mouseUnlockCursor()
+	if args[1] ~= "nonotify" then
+		notify('Mouse Unlocked','The mouse cursor is unlocked and visible',5)
+	end
+end)
+
+addcmd('lockcursor',{'centercursor','centermouse','lockmouse'},function(args, speaker)
+	mouseKeep("MouseBehavior")
+	UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+	if args[1] ~= "nonotify" then
+		notify('Mouse Locked','The mouse cursor is locked to the center of the screen',5)
+	end
+end)
+
+addcmd('defaultcursor',{'defaultmouse','dcursor','defcursor','defcur','dfcur','restorecursor','rscur'},function(args, speaker)
+	mouseUnlockCursor()
+	mouseKeep("MouseIcon")
+	UserInputService.MouseIcon = ""
+	if args[1] ~= "nonotify" then
+		notify('Default Cursor','The cursor was reset to the Roblox default cursor',5)
+	end
+end)
+
+addcmd('gamecursor',{'gamemouse','gcursor','gmouse','gamecur','gcur','restoremouse'},function(args, speaker)
+	mouseRestoreGameCursor()
+	if args[1] ~= "nonotify" then
+		notify('Game Cursor','Reverted AEX cursor changes back to what the game had',5)
+	end
 end)
 
 local nameBox = nil
