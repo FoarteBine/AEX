@@ -5714,7 +5714,7 @@ CMDs[#CMDs + 1] = {NAME = 'fly2speed / tflyspeed [num]', DESC = 'Set fly2 speed 
 CMDs[#CMDs + 1] = {NAME = 'fly2smooth / tflysmooth [0-1]', DESC = 'fly2 rotation smoothing (0 = instant, 1 = very smooth)'}
 CMDs[#CMDs + 1] = {NAME = 'fly2tiltmax / tflytiltmax [num]', DESC = 'fly2 maximum tilt angle (default is 25)'}
 CMDs[#CMDs + 1] = {NAME = 'fly2tiltinc / tflytiltinc [num]', DESC = 'fly2 how fast it reaches that tilt (default is 1)'}
-CMDs[#CMDs + 1] = {NAME = 'unfly', DESC = 'Disables fly'}
+CMDs[#CMDs + 1] = {NAME = 'unfly / unfly2', DESC = 'Disables fly and fly2'}
 CMDs[#CMDs + 1] = {NAME = 'flyspeed [num]', DESC = 'Set fly speed (default is 20)'}
 CMDs[#CMDs + 1] = {NAME = 'vehiclefly / vfly [speed]', DESC = 'Makes you fly in a vehicle'}
 CMDs[#CMDs + 1] = {NAME = 'unvehiclefly / unvfly', DESC = 'Disables vehicle fly'}
