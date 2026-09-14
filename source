@@ -7835,9 +7835,16 @@ function LoadPlugin(val,startup)
 				addcmd(cmdName, v["Aliases"], v["Function"], val)
 				if v["ListName"] then
 					local newName = v.ListName
-					local cmdNames = {i,unpack(v.Aliases)}
+					local cmdNames = {i}
+					if type(v["Aliases"]) == "table" then
+						for _, aliasName in ipairs(v["Aliases"]) do
+							table.insert(cmdNames, aliasName)
+						end
+					end
 					for i,v in pairs(cmdNames) do
-						newName = newName:gsub(v,v..cmdExt)
+						if type(v) == "string" then
+							newName = newName:gsub(v,v..cmdExt)
+						end
 					end
 					addcmdtext(newName,val,v["Description"])
 				else
@@ -8000,6 +8007,21 @@ function hubParseList(body)
 				local ic = v.Icon or v.icon
 				e.icon = (type(ic) == "string" and ic) or ""
 				e.iconAsset = nil
+				local cm = v.Commands or v.commands
+				e.cmds = ""
+				e.ncmds = 0
+				e.cmdlist = {}
+				if type(cm) == "table" then
+					for _, cv in ipairs(cm) do
+						if type(cv) == "string" then
+							table.insert(e.cmdlist, cv)
+						elseif type(cv) == "table" and type(cv.Name) == "string" then
+							table.insert(e.cmdlist, cv.Name)
+						end
+					end
+					e.cmds = table.concat(e.cmdlist, " ")
+					e.ncmds = #e.cmdlist
+				end
 				table.insert(out, e)
 			end
 		end
@@ -8146,7 +8168,16 @@ function hubMakeCard(e, order)
 	meta.TextXAlignment = Enum.TextXAlignment.Left
 	meta.TextTruncate = Enum.TextTruncate.AtEnd
 	meta.TextColor3 = HUB_MUTED
-	meta.Text = "by " .. e.author .. "   ·   " .. e.cat
+	local extra = ""
+	if type(e.cmds) == "string" and e.cmds ~= "" then
+		local words = {}
+		for word in e.cmds:gmatch("%S+") do table.insert(words, word) end
+		local shownCmds = {}
+		for i = 1, math.min(3, #words) do table.insert(shownCmds, words[i]) end
+		extra = "   ·   " .. table.concat(shownCmds, ", ")
+		if #words > 3 then extra = extra .. " +" .. (#words - 3) end
+	end
+	meta.Text = "by " .. e.author .. "   ·   " .. e.cat .. extra
 	meta.ZIndex = 12
 
 	local ds = Instance.new("TextLabel")
@@ -8229,7 +8260,7 @@ function hubMatches(e)
 	if hubCat ~= "All" and e.cat ~= hubCat then return false end
 	if hubQuery ~= "" then
 		local q = hubQuery
-		local hay = string.lower(e.name .. " " .. e.author .. " " .. e.desc .. " " .. e.id)
+		local hay = string.lower(e.name .. " " .. e.author .. " " .. e.desc .. " " .. e.id .. " " .. (e.cmds or ""))
 		if not hay:find(q, 1, true) then return false end
 	end
 	return true
