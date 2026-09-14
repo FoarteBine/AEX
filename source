@@ -8555,7 +8555,7 @@ function buildPluginsHub()
 	hubList.BottomImage = ""
 	hubList.MidImage = ""
 	hubList.TopImage = ""
-	hubList.VerticalScrollBarInset = Enum.VerticalScrollBarInset.Scrollbar
+	hubList.VerticalScrollBarInset = 'Always'
 	hubList.ZIndex = 11
 	hubListLayout = Instance.new("UIListLayout")
 	hubListLayout.Parent = hubList
