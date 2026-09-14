@@ -17,6 +17,10 @@
 
 **AEX** is an enterprise-grade modification and redesign of the Infinity Yield framework. Engineered to elevate the standard administrative execution experience, AEX bridges the gap between raw performance and aesthetic refinement. It implements a complete visual overhaul, optimized core subsystems, and an expanded command library tailored for high-efficiency operation.
 
+## Authors 
+FoarteBine - Main AEX developer, visual designer.
+Distendo - AEX developer , mainly fun/useful scripts.
+
 ---
 
 ## Core Architectural Enhancements
@@ -35,4 +39,5 @@
 Execute the loadstring below within your target environment to initialize AEX:
 
 ```lua
-loadstring(game:HttpGet("[https://raw.githubusercontent.com/FoarteBine/AEX/main/source](https://raw.githubusercontent.com/FoarteBine/AEX/main/source)"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/FoarteBine/AEX/refs/heads/main/source"))()
+
