@@ -3243,6 +3243,7 @@ defaultsettings = {
 	bgFit = "Crop";
 	bgDark = 40;
 	bgBlur = 0;
+	lastAnnouncement = "";
 	eventBinds = eventEditor.SaveData()
 }
 
@@ -3268,6 +3269,7 @@ useFactorySettings = function()
 	bgFit = "Crop"
 	bgDark = 40
 	bgBlur = 0
+	lastAnnouncement = ""
 end
 
 function createPopup(title, text)
@@ -3392,6 +3394,7 @@ function saves()
 					if vtype(json.bgFit, "string") then bgFit = json.bgFit else bgFit = "Crop" end
 					if vtype(json.bgDark, "number") then bgDark = math.clamp(math.floor(json.bgDark), 0, 95) else bgDark = 40 end
 					if vtype(json.bgBlur, "number") then bgBlur = math.clamp(math.floor(json.bgBlur), 0, 24) else bgBlur = 0 end
+					if vtype(json.lastAnnouncement, "string") then lastAnnouncement = json.lastAnnouncement else lastAnnouncement = "" end
 					if vtype(json.eventBinds, "string") then loadedEventData = json.eventBinds end
 				end)
 				if not success then
@@ -3468,6 +3471,7 @@ function updatesaves()
 			bgFit = bgFit or "Crop";
 			bgDark = bgDark or 40;
 			bgBlur = bgBlur or 0;
+			lastAnnouncement = type(lastAnnouncement) == "string" and lastAnnouncement or "";
 			eventBinds = eventEditor.SaveData()
 		}
 		writefileCooldown("AEX_FE.aex", HttpService:JSONEncode(update))
@@ -5640,6 +5644,8 @@ end
 
 CMDs = {}
 CMDs[#CMDs + 1] = {NAME = 'discord / support / help', DESC = 'Invite to the AEX discord server.'}
+CMDs[#CMDs + 1] = {NAME = 'announce / showannounce', DESC = 'Shows the current version announcement again'}
+CMDs[#CMDs + 1] = {NAME = 'resetannounce / clearannounce', DESC = 'Makes the startup announcement show once more on the next launch'}
 CMDs[#CMDs + 1] = {NAME = 'cmdhint / suggest [on/off]', DESC = 'Toggles the grey command hint in the command bar. TAB or RIGHT accepts it, tapping the hint works on mobile.'}
 CMDs[#CMDs + 1] = {NAME = 'guiscale [number]', DESC = 'Changes the size of the gui. [number] accepts decimals and whole numbers. Min is 0.4 and Max is 2'}
 CMDs[#CMDs + 1] = {NAME = 'console', DESC = 'Opens the Roblox console'}
@@ -16431,14 +16437,32 @@ CaptureService.CaptureEnded:Connect(function()
 	end)
 end)
 
+addcmd('announce',{'showannounce','announcement'},function(args, speaker)
+	if type(announceText) == "string" and announceText ~= "" then
+		createPopup('Server Announcement', announceText)
+	else
+		notify('Announcement','No announcement has been fetched this session',5)
+	end
+end)
+
+addcmd('resetannounce',{'clearannounce','announceclear'},function(args, speaker)
+	lastAnnouncement = ""
+	updatesaves()
+	notify('Announcement','The startup announcement will show again next time',5)
+end)
+
 task.spawn(function()
 	local success, latestVersionInfo = pcall(function() 
 		local versionJson = game:HttpGet("https://raw.githubusercontent.com/FoarteBine/AEX/refs/heads/main/version")
 		return HttpService:JSONDecode(versionJson)
 	end)
 
-	if success then
-		if latestVersionInfo.Announcement and latestVersionInfo.Announcement ~= "" then
+	if success and type(latestVersionInfo) == "table" then
+		announceText = type(latestVersionInfo.Announcement) == "string" and latestVersionInfo.Announcement or ""
+		-- show a given announcement only once: remember it in the settings file
+		if announceText ~= "" and announceText ~= lastAnnouncement then
+			lastAnnouncement = announceText
+			pcall(updatesaves)
 			local AnnGUI = Instance.new("Frame")
 			local background = Instance.new("Frame")
 			local TextBox = Instance.new("TextLabel")
@@ -16473,7 +16497,7 @@ task.spawn(function()
 			TextBox.Font = Enum.Font.Gotham
 			TextBox.TextSize = 18
 			TextBox.TextWrapped = true
-			TextBox.Text = latestVersionInfo.Announcement
+			TextBox.Text = announceText
 			TextBox.TextColor3 = currentText1
 			TextBox.TextXAlignment = Enum.TextXAlignment.Left
 			TextBox.TextYAlignment = Enum.TextYAlignment.Top
