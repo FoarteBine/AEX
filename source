@@ -7799,11 +7799,6 @@ function aexespEnable(state)
 			aexesp.joinConn = Players.PlayerAdded:Connect(function(plr)
 				if ESPenabled then
 					aexespOverlayFor(plr)
-					task.delay(1.5, function()
-						if ESPenabled and plr.Character then
-							ESP(plr, espConfig.teamcolors)
-						end
-					end)
 				end
 			end)
 		end
