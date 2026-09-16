@@ -7423,9 +7423,6 @@ aexesp = {
     }
 }
 
-if type(espConfig)~="table" then espConfig={} end
-espConfig = aexespNormalize(espConfig)
-
 function aexespNormalize(cfg)
     local out={}
     for k,v in pairs(aexesp.defaults) do out[k]=cfg[k] or v end
@@ -7436,6 +7433,10 @@ function aexespNormalize(cfg)
     end
     return out
 end
+
+if type(espConfig)~="table" then espConfig={} end
+espConfig = aexespNormalize(espConfig)
+
 
 function aexespColor()
     local c=espConfig.color
