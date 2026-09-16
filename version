@@ -1,1 +1,1 @@
-{"Version":"0.1.5","Announcement":"v0.1.5: ESP overhaul - 2D boxes, health bars, names, distance, tracers and white state icons. Everything is toggleable in the new ESP Settings window (Settings > ESP Settings, or ;espconfig / ;visuals), and your ESP config now saves along with the rest of your settings."}
+﻿{"Version":"0.1.5.1","Announcement":"v0.1.5.1: ESP rewritten from scratch, legacy IY ESP roots removed, autonomous outline and overlay."}
