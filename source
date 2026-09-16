@@ -7676,9 +7676,10 @@ function aexespOverlayFor(plr)
 	data.nameText = text("Name", espConfig.textsize, 13)
 	data.distText = text("Distance", math.max(11, espConfig.textsize - 2), 13)
 
+	-- BillboardGuis are unreliable inside a GuiObject -> straight under the ScreenGui
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "StateIcon"
-	bb.Parent = root
+	bb.Parent = gui
 	bb.Size = UDim2.fromOffset(30, 30)
 	bb.AlwaysOnTop = true
 	bb.ExtentsOffset = Vector3.new(0, 3, 0)
@@ -7702,6 +7703,9 @@ function aexespDropOverlay(plr)
 	if data then
 		pcall(function()
 			data.frame:Destroy()
+		end)
+		pcall(function()
+			data.iconGui:Destroy()
 		end)
 		aexesp.overlays[plr] = nil
 	end
