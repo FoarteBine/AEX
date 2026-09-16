@@ -7676,14 +7676,15 @@ function aexespOverlayFor(plr)
 	data.nameText = text("Name", espConfig.textsize, 13)
 	data.distText = text("Distance", math.max(11, espConfig.textsize - 2), 13)
 
-	-- BillboardGuis are unreliable inside a GuiObject -> straight under the ScreenGui
+	-- BillboardGui must live in Workspace, parent to Head when visible
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "StateIcon"
-	bb.Parent = gui
 	bb.Size = UDim2.fromOffset(30, 30)
 	bb.AlwaysOnTop = true
 	bb.ExtentsOffset = Vector3.new(0, 3, 0)
 	bb.Enabled = false
+	bb.Adornee = nil
+	-- parent will be set to head on first update
 	local img = Instance.new("ImageLabel")
 	img.Parent = bb
 	img.BackgroundTransparency = 1
@@ -7826,6 +7827,9 @@ function aexespUpdate()
 					end
 
 					if espConfig.icons and head then
+						if data.iconGui.Parent ~= head then
+							data.iconGui.Parent = head
+						end
 						local wantIcon = aexespIconFor(hum)
 						if data.iconImg.Image ~= wantIcon then
 							data.iconImg.Image = wantIcon
