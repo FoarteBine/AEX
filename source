@@ -11752,11 +11752,6 @@ end)
 addcmd('esp',{},function(args, speaker)
 	if not CHMSenabled then
 		ESPenabled = true
-		for i,v in pairs(Players:GetPlayers()) do
-			if v.Name ~= speaker.Name then
-				ESP(v, espConfig.teamcolors)
-			end
-		end
 		aexespEnable(true)
 	else
 		notify('ESP','Disable chams (nochams) before using esp')
@@ -11767,11 +11762,6 @@ addcmd('espteam',{},function(args, speaker)
 	if not CHMSenabled then
 		ESPenabled = true
 		espConfig.teamcolors = true
-		for i,v in pairs(Players:GetPlayers()) do
-			if v.Name ~= speaker.Name then
-				ESP(v, true)
-			end
-		end
 		aexespEnable(true)
 		aexespSave()
 	else
