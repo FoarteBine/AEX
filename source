@@ -7369,8 +7369,7 @@ function CHMS(plr)
 end
 
 -- // ===================== AEX ESP visuals =====================
--- 2D Drawing ESP (box, health bar, name, distance, tracers, state icons) + settings.
--- Minimal, Drawing-based, no legacy ESP.
+-- Drawing-based ESP with full settings UI.
 
 aexesp = {
     overlays = {},
@@ -7379,10 +7378,6 @@ aexesp = {
     leftConn = nil,
     gui = nil,
     win = nil,
-    winConn = nil,
-    winDrag = nil,
-    rows = {},
-    dragging = nil,
     defaults = {
         outline = true,
         box = true,
@@ -7392,11 +7387,11 @@ aexesp = {
         tracers = false,
         icons = true,
         teamcolors = false,
-        legacytext = false,
         maxdist = 2000,
-        textsize = 15,
+        textsize = 14,
         thickness = 1,
         opacity = 100,
+        color = nil,
     },
     icons = {
         walk = "rbxassetid://117030571122427",
@@ -7416,234 +7411,300 @@ aexesp = {
         {"teamcolors","Team colors"},
     },
     sliders = {
-        {"maxdist","Range",1,5000,"","m"},
-        {"textsize","Text size",10,24,"",""},
-        {"thickness","Thickness",1,5,"",""},
-        {"opacity","Opacity",10,100,"","%"},
+        {"maxdist","Range",10,5000,"m"},
+        {"textsize","Text size",8,28,"px"},
+        {"thickness","Thickness",1,4,""},
+        {"opacity","Opacity",20,100,"%"},
+    },
+    presets = {
+        {255,255,255},
+        {255,60,60},
+        {60,220,120},
+        {60,140,255},
+        {255,200,60},
+        {200,60,255},
+        {60,255,255},
+        {255,120,60},
     }
 }
 
 function aexespNormalize(cfg)
-    local out={}
-    for k,v in pairs(aexesp.defaults) do out[k]=cfg[k] or v end
+    local out = {}
+    for k,v in pairs(aexesp.defaults) do
+        if cfg[k] == nil then out[k] = v else out[k] = cfg[k] end
+    end
     for _,s in pairs(aexesp.sliders) do
-        local k=s[1]
-        local n=tonumber(out[k])
-        if n then out[k]=math.clamp(math.floor(n),s[3],s[4]) else out[k]=aexesp.defaults[k] end
+        local n = tonumber(out[s[1]])
+        if n then out[s[1]] = math.clamp(math.floor(n), s[3], s[4])
+        else out[s[1]] = aexesp.defaults[s[1]] end
     end
     return out
 end
 
-if type(espConfig)~="table" then espConfig={} end
+if type(espConfig) ~= "table" then espConfig = {} end
 espConfig = aexespNormalize(espConfig)
 
-
 function aexespColor()
-    local c=espConfig.color
-    if c then return Color3.new(c[1]/255,c[2]/255,c[3]/255) end
-    return currentText1
+    if espConfig.color then
+        return Color3.fromRGB(espConfig.color[1], espConfig.color[2], espConfig.color[3])
+    end
+    return AEX_ACCENT or Color3.fromRGB(99,102,241)
 end
 
 function aexespOpacity()
-    return 1 - (espConfig.opacity or 100)/100
+    return math.clamp((espConfig.opacity or 100) / 100, 0.2, 1)
 end
 
 function aexespIconFor(hum)
-    if not hum then return aexesp.icons.idle end
-    if hum.Health<=0 then return aexesp.icons.dead end
-    local ok,state=pcall(function() return hum:GetState() end)
-    if ok and state then
-        if state==Enum.HumanoidStateType.Jumping or state==Enum.HumanoidStateType.Freefall then return aexesp.icons.jump end
-        if state==Enum.HumanoidStateType.Swimming then return aexesp.icons.swim end
+    if not hum or hum.Health <= 0 then return aexesp.icons.dead end
+    local ok, st = pcall(function() return hum:GetState() end)
+    if ok and st then
+        if st == Enum.HumanoidStateType.Jumping or st == Enum.HumanoidStateType.Freefall then return aexesp.icons.jump end
+        if st == Enum.HumanoidStateType.Swimming then return aexesp.icons.swim end
     end
-    if hum.MoveDirection.Magnitude>0.1 then return aexesp.icons.walk end
+    if hum.MoveDirection and hum.MoveDirection.Magnitude > 0.1 then return aexesp.icons.walk end
     return aexesp.icons.idle
 end
 
 function aexespSameTeam(plr)
-    local me=Players.LocalPlayer
-    if me and me.Team and plr and plr.Team then return me.Team==plr.Team end
+    local me = Players.LocalPlayer
+    if me and me.Team and plr and plr.Team then return me.Team == plr.Team end
     return false
 end
 
-function aexespEnsureGui()
-    if aexesp.gui and aexesp.gui.Parent then return end
-    local parent=gethui and gethui() or COREGUI
-    local gui=Instance.new("ScreenGui")
-    gui.Name="AEX_ESP_Icons"
-    gui.ResetOnSpawn=false
-    gui.IgnoreGuiInset=true
-    gui.DisplayOrder=8
-    gui.Parent=parent
-    aexesp.gui=gui
+function aexespGetLayerColor(plr)
+    if espConfig.teamcolors then
+        return aexespSameTeam(plr) and Color3.fromRGB(80,230,120) or Color3.fromRGB(255,70,70)
+    end
+    return aexespColor()
 end
 
 function aexespCreateOverlay(plr)
     if aexesp.overlays[plr] then return end
-    aexespEnsureGui()
-    local d={}
-    d.box=Drawing.new("Square")
-    d.box.Thickness=1
-    d.box.Filled=false
-    d.box.Visible=false
-    d.hp=Drawing.new("Square")
-    d.hp.Thickness=1
-    d.hp.Filled=true
-    d.hp.Visible=false
-    d.name=Drawing.new("Text")
-    d.name.Center=true
-    d.name.Outline=true
-    d.name.Visible=false
-    d.dist=Drawing.new("Text")
-    d.dist.Center=true
-    d.dist.Outline=true
-    d.dist.Visible=false
-    d.tracer=Drawing.new("Line")
-    d.tracer.Thickness=1
-    d.tracer.Visible=false
-    local bb=Instance.new("BillboardGui")
-    bb.Name="StateIcon"
-    bb.Size=UDim2.fromOffset(30,30)
-    bb.AlwaysOnTop=true
-    bb.ExtentsOffset=Vector3.new(0,3,0)
-    bb.Enabled=false
-    local img=Instance.new("ImageLabel")
-    img.Parent=bb
-    img.BackgroundTransparency=1
-    img.Size=UDim2.new(1,0,1,0)
-    img.Image=aexesp.icons.idle
-    img.ImageColor3=Color3.new(1,1,1)
-    d.iconGui=bb
-    d.iconImg=img
-    d.outlineAdorn=nil
-    aexesp.overlays[plr]=d
+    local d = {}
+    d.box = Drawing.new("Square")
+    d.box.Thickness = 1
+    d.box.Filled = false
+    d.box.Visible = false
+
+    d.boxFill = Drawing.new("Square")
+    d.boxFill.Thickness = 1
+    d.boxFill.Filled = true
+    d.boxFill.Transparency = 0.85
+    d.boxFill.Visible = false
+
+    d.hpOut = Drawing.new("Square")
+    d.hpOut.Thickness = 1
+    d.hpOut.Filled = true
+    d.hpOut.Color = Color3.fromRGB(20,20,25)
+    d.hpOut.Visible = false
+
+    d.hp = Drawing.new("Square")
+    d.hp.Thickness = 1
+    d.hp.Filled = true
+    d.hp.Visible = false
+
+    d.name = Drawing.new("Text")
+    d.name.Center = true
+    d.name.Outline = true
+    d.name.Visible = false
+
+    d.dist = Drawing.new("Text")
+    d.dist.Center = true
+    d.dist.Outline = true
+    d.dist.Visible = false
+
+    d.tracer = Drawing.new("Line")
+    d.tracer.Thickness = 1
+    d.tracer.Visible = false
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "StateIcon"
+    bb.Size = UDim2.fromOffset(30, 30)
+    bb.AlwaysOnTop = true
+    bb.ExtentsOffset = Vector3.new(0, 3, 0)
+    bb.Enabled = false
+    local img = Instance.new("ImageLabel")
+    img.Parent = bb
+    img.BackgroundTransparency = 1
+    img.Size = UDim2.new(1, 0, 1, 0)
+    img.Image = aexesp.icons.idle
+    img.ImageColor3 = Color3.new(1, 1, 1)
+    d.iconGui = bb
+    d.iconImg = img
+    d.outlineAdorn = nil
+
+    aexesp.overlays[plr] = d
 end
 
 function aexespDropOverlay(plr)
-    local d=aexesp.overlays[plr]
+    local d = aexesp.overlays[plr]
     if d then
         pcall(function() d.box:Remove() end)
+        pcall(function() d.boxFill:Remove() end)
+        pcall(function() d.hpOut:Remove() end)
         pcall(function() d.hp:Remove() end)
         pcall(function() d.name:Remove() end)
         pcall(function() d.dist:Remove() end)
         pcall(function() d.tracer:Remove() end)
         if d.iconGui then d.iconGui:Destroy() end
         if d.outlineAdorn then pcall(function() d.outlineAdorn:Destroy() end) end
-        aexesp.overlays[plr]=nil
+        aexesp.overlays[plr] = nil
     end
 end
 
 function aexespUpdate()
     if not ESPenabled then return end
-    local cam=workspace.CurrentCamera
+    local cam = workspace.CurrentCamera
     if not cam then return end
-    local col=aexespColor()
-    local trans=aexespOpacity()
-    local myChar=Players.LocalPlayer.Character
-    local myRoot=myChar and getRoot(myChar)
-    for plr,d in pairs(aexesp.overlays) do
-        local char=plr.Character
-        local hum=char and char:FindFirstChildOfClass("Humanoid")
-        local root=char and getRoot(char)
-        local head=char and char:FindFirstChild("Head")
-        if plr~=Players.LocalPlayer and char and hum and hum.Health>0 and root then
-            local topPos,vis=cam:WorldToViewportPoint((head and head.Position or root.Position)+Vector3.new(0,0.45,0))
-            local botPos=cam:WorldToViewportPoint(root.Position-Vector3.new(0,root.Size.Y*1.15+0.1,0))
-            local height=botPos.Y-topPos.Y
-            local dist=myRoot and math.floor((root.Position-myRoot.Position).Magnitude) or 0
-            if vis and botPos.Z>0 and height>4 and dist<=espConfig.maxdist then
-                local width=height*0.45
-                local topX=topPos.X-width/2
-                local layerCol=espConfig.teamcolors and (aexespSameTeam(plr) and Color3.fromRGB(80,230,120) or Color3.fromRGB(255,70,70)) or col
-                d.box.Color=layerCol
-                d.box.Thickness=espConfig.thickness
-                d.box.Transparency=trans
+    local myChar = Players.LocalPlayer.Character
+    local myRoot = myChar and getRoot(myChar)
+    local t = espConfig.thickness
+    local ts = espConfig.textsize
+
+    for plr, d in pairs(aexesp.overlays) do
+        local char = plr.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and getRoot(char)
+        local head = char and char:FindFirstChild("Head")
+
+        if plr ~= Players.LocalPlayer and char and hum and hum.Health > 0 and root then
+            local topV, topVis = cam:WorldToViewportPoint((head and head.Position or root.Position) + Vector3.new(0, 0.5, 0))
+            local botV = cam:WorldToViewportPoint(root.Position - Vector3.new(0, root.Size.Y * 1.15 + 0.1, 0))
+            local h = botV.Y - topV.Y
+            local dist = myRoot and math.floor((root.Position - myRoot.Position).Magnitude) or 0
+
+            if topVis and botV.Z > 0 and h > 5 and dist <= espConfig.maxdist then
+                local w = h * 0.45
+                local tx = topV.X - w / 2
+                local ty = topV.Y
+                local col = aexespGetLayerColor(plr)
+                local op = aexespOpacity()
+
                 if espConfig.box then
-                    d.box.Size=Vector2.new(width,height)
-                    d.box.Position=Vector2.new(topX,topPos.Y)
-                    d.box.Visible=true
-                else d.box.Visible=false end
-                if espConfig.healthbar and hum.MaxHealth>0 then
-                    local hp=math.clamp(hum.Health/hum.MaxHealth,0,1)
-                    d.hp.Color=Color3.fromHSV(hp*0.33,1,1)
-                    d.hp.Transparency=trans
-                    d.hp.Size=Vector2.new(4,height)
-                    d.hp.Position=Vector2.new(topX-6,topPos.Y)
-                    d.hp.Visible=true
-                else d.hp.Visible=false end
+                    d.box.Color = col
+                    d.box.Thickness = t
+                    d.box.Transparency = op
+                    d.box.Size = Vector2.new(w, h)
+                    d.box.Position = Vector2.new(tx, ty)
+                    d.box.Visible = true
+
+                    d.boxFill.Color = col
+                    d.boxFill.Transparency = 1 - (op * 0.12)
+                    d.boxFill.Size = Vector2.new(w, h)
+                    d.boxFill.Position = Vector2.new(tx, ty)
+                    d.boxFill.Visible = true
+                else
+                    d.box.Visible = false
+                    d.boxFill.Visible = false
+                end
+
+                if espConfig.healthbar and hum.MaxHealth > 0 then
+                    local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    local bw = math.max(2, t + 1)
+                    d.hpOut.Size = Vector2.new(bw + 2, h + 2)
+                    d.hpOut.Position = Vector2.new(tx - bw - 3, ty - 1)
+                    d.hpOut.Visible = true
+
+                    d.hp.Color = Color3.fromHSV(hp * 0.33, 0.9, 1)
+                    d.hp.Size = Vector2.new(bw, h * hp)
+                    d.hp.Position = Vector2.new(tx - bw - 2, ty + h * (1 - hp))
+                    d.hp.Visible = true
+                else
+                    d.hpOut.Visible = false
+                    d.hp.Visible = false
+                end
+
                 if espConfig.name then
-                    d.name.Color=layerCol
-                    d.name.TextSize=espConfig.textsize
-                    d.name.Text=plr.Name
-                    d.name.Position=Vector2.new(topPos.X,topPos.Y-12)
-                    d.name.Visible=true
-                else d.name.Visible=false end
+                    d.name.Text = plr.DisplayName ~= plr.Name and (plr.DisplayName.." ("..plr.Name..")") or plr.Name
+                    d.name.Size = ts
+                    d.name.Color = col
+                    d.name.Position = Vector2.new(topV.X, ty - ts - 4)
+                    d.name.Visible = true
+                else
+                    d.name.Visible = false
+                end
+
                 if espConfig.distance then
-                    d.dist.Color=layerCol
-                    d.dist.TextSize=math.max(11,espConfig.textsize-2)
-                    d.dist.Text=dist.."m"
-                    d.dist.Position=Vector2.new(topPos.X,botPos.Y+12)
-                    d.dist.Visible=true
-                else d.dist.Visible=false end
+                    d.dist.Text = dist .. "m"
+                    d.dist.Size = math.max(10, ts - 2)
+                    d.dist.Color = col
+                    d.dist.Position = Vector2.new(topV.X, ty + h + 3)
+                    d.dist.Visible = true
+                else
+                    d.dist.Visible = false
+                end
+
                 if espConfig.tracers then
-                    d.tracer.Color=layerCol
-                    d.tracer.Transparency=trans
-                    d.tracer.From=Vector2.new(cam.ViewportSize.X/2,cam.ViewportSize.Y)
-                    d.tracer.To=Vector2.new(topPos.X,botPos.Y)
-                    d.tracer.Visible=true
-                else d.tracer.Visible=false end
+                    d.tracer.Color = col
+                    d.tracer.Thickness = t
+                    d.tracer.Transparency = op
+                    d.tracer.From = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y)
+                    d.tracer.To = Vector2.new(topV.X, ty + h / 2)
+                    d.tracer.Visible = true
+                else
+                    d.tracer.Visible = false
+                end
+
                 if espConfig.icons and head then
-                    d.iconGui.Parent=head
-                    d.iconGui.Adornee=head
-                    d.iconImg.ImageTransparency=trans
-                    d.iconImg.Image=aexespIconFor(hum)
-                    d.iconGui.Enabled=true
-                else d.iconGui.Enabled=false end
+                    d.iconGui.Parent = head
+                    d.iconGui.Adornee = head
+                    d.iconImg.ImageTransparency = op
+                    d.iconImg.Image = aexespIconFor(hum)
+                    d.iconGui.Enabled = true
+                else
+                    d.iconGui.Enabled = false
+                end
+
                 if espConfig.outline then
                     if not d.outlineAdorn then
-                        local ad=Instance.new("BoxHandleAdornment")
-                        ad.Name="AEXOutline"
-                        ad.Adornee=root
-                        ad.AlwaysOnTop=true
-                        ad.Size=root.Size*1.05
-                        ad.Color3=layerCol
-                        ad.Transparency=0.6
-                        ad.Parent=root
-                        d.outlineAdorn=ad
+                        local ad = Instance.new("BoxHandleAdornment")
+                        ad.Name = "AEXOutline"
+                        ad.Adornee = root
+                        ad.AlwaysOnTop = true
+                        ad.Size = root.Size * 1.05
+                        ad.Color3 = col
+                        ad.Transparency = 0.5
+                        ad.Parent = root
+                        d.outlineAdorn = ad
                     else
-                        d.outlineAdorn.Color3=layerCol
+                        d.outlineAdorn.Color3 = col
+                        d.outlineAdorn.Transparency = 0.5
                     end
-                elseif d.outlineAdorn then
-                    pcall(function() d.outlineAdorn:Destroy() end)
-                    d.outlineAdorn=nil
+                else
+                    if d.outlineAdorn then pcall(function() d.outlineAdorn:Destroy() end) d.outlineAdorn = nil end
                 end
             else
-                d.box.Visible=false; d.hp.Visible=false; d.name.Visible=false; d.dist.Visible=false; d.tracer.Visible=false; d.iconGui.Enabled=false
-                if d.outlineAdorn then pcall(function() d.outlineAdorn:Destroy() end) d.outlineAdorn=nil end
+                d.box.Visible = false; d.boxFill.Visible = false
+                d.hpOut.Visible = false; d.hp.Visible = false
+                d.name.Visible = false; d.dist.Visible = false; d.tracer.Visible = false; d.iconGui.Enabled = false
+                if d.outlineAdorn then pcall(function() d.outlineAdorn:Destroy() end) d.outlineAdorn = nil end
             end
         else
-            d.box.Visible=false; d.hp.Visible=false; d.name.Visible=false; d.dist.Visible=false; d.tracer.Visible=false; d.iconGui.Enabled=false
+            d.box.Visible = false; d.boxFill.Visible = false
+            d.hpOut.Visible = false; d.hp.Visible = false
+            d.name.Visible = false; d.dist.Visible = false; d.tracer.Visible = false; d.iconGui.Enabled = false
         end
     end
 end
 
 function aexespEnable(state)
     if state then
-        aexespEnsureGui()
-        for _,plr in pairs(Players:GetPlayers()) do if plr~=Players.LocalPlayer then aexespCreateOverlay(plr) end end
-        if not aexesp.conn then aexesp.conn=RunService.RenderStepped:Connect(aexespUpdate) end
-        if not aexesp.joinConn then aexesp.joinConn=Players.PlayerAdded:Connect(function(p) if ESPenabled then aexespCreateOverlay(p) end end) end
-        if not aexesp.leftConn then aexesp.leftConn=Players.PlayerRemoving:Connect(aexespDropOverlay) end
+        for _,plr in pairs(Players:GetPlayers()) do
+            if plr ~= Players.LocalPlayer then aexespCreateOverlay(plr) end
+        end
+        if not aexesp.conn then aexesp.conn = RunService.RenderStepped:Connect(aexespUpdate) end
+        if not aexesp.joinConn then
+            aexesp.joinConn = Players.PlayerAdded:Connect(function(plr)
+                if ESPenabled then aexespCreateOverlay(plr) end
+            end)
+        end
+        if not aexesp.leftConn then
+            aexesp.leftConn = Players.PlayerRemoving:Connect(aexespDropOverlay)
+        end
     else
-        if aexesp.conn then aexesp.conn:Disconnect() aexesp.conn=nil end
+        if aexesp.conn then aexesp.conn:Disconnect() aexesp.conn = nil end
         for plr in pairs(aexesp.overlays) do aexespDropOverlay(plr) end
-        if aexesp.gui then aexesp.gui:Destroy() aexesp.gui=nil end
-    end
-end
-
-function aexespAfterSet()
-    for _,d in pairs(aexesp.overlays) do
-        if d.box then d.box.Color=aexespColor() end
     end
 end
 
@@ -7651,40 +7712,357 @@ function aexespSave()
     task.spawn(function() wait() pcall(updatesaves) end)
 end
 
-function aexespParseBool(v)
-    local s=string.lower(tostring(v))
-    return s=="on" or s=="true" or s=="1" or s=="enable" or s=="yes" or s=="да" or s=="вкл"
-end
-
-function aexespSet(k,v)
-    k=string.lower(tostring(k))
-    for _,r in pairs(aexesp.toggles) do
-        if r[1]==k then
-            local b
-            if type(v)=="boolean" then b=v elseif v==nil then b=not espConfig[k] else b=aexespParseBool(v) end
-            espConfig[k]=b
-            aexespAfterSet()
+function aexespSet(key, val)
+    key = string.lower(tostring(key))
+    for _,t in pairs(aexesp.toggles) do
+        if t[1] == key then
+            if type(val) == "boolean" then espConfig[key] = val
+            elseif val == nil then espConfig[key] = not espConfig[key]
+            else espConfig[key] = tostring(val) == "true" or tostring(val) == "on" or tostring(val) == "1" end
             aexespSave()
             return true
         end
     end
     for _,s in pairs(aexesp.sliders) do
-        if s[1]==k then
-            local n=tonumber(type(v)=="table" and v[1] or v)
-            if n then espConfig[k]=math.clamp(math.floor(n),s[3],s[4]) aexespSave() return true end
+        if s[1] == key then
+            local n = tonumber(val)
+            if n then espConfig[key] = math.clamp(math.floor(n), s[3], s[4]); aexespSave() return true end
         end
     end
-    if k=="color" then
-        if type(v)=="table" and #v>=3 then espConfig.color={v[1],v[2],v[3]} aexespSave() return true end
-        if type(v)=="string" and (v=="theme" or v=="reset" or v=="off") then espConfig.color=nil aexespSave() return true end
+    if key == "color" then
+        if type(val) == "table" and #val >= 3 then
+            espConfig.color = {math.floor(val[1]), math.floor(val[2]), math.floor(val[3])}
+            aexespSave()
+            return true
+        elseif val == "theme" or val == nil then
+            espConfig.color = nil
+            aexespSave()
+            return true
+        end
     end
     return false
 end
 
-addcmd('espconfig',{'esps','visuals','espsettings','espui'},function() notify('ESP','Settings window not implemented in short build') end)
-addcmd('espset',{'espvalue'},function(a) local k=a[1] local v=a[2] if k and v then aexespSet(k,v) notify('ESP',espConfig[k] and 'ok' or 'no') end end)
-addcmd('espcolor',{'esprgb'},function(a) if #a>=3 then aexespSet('color',{tonumber(a[1]),tonumber(a[2]),tonumber(a[3])}) end end)
-addcmd('espdist',{'espmaxdist'},function(a) if a[1] then aexespSet('maxdist',a[1]) end end)
+function aexespToggleWindow()
+    if aexesp.win then
+        aexesp.win.Visible = not aexesp.win.Visible
+        return
+    end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "AEXEspSettings"
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    local parent = gethui and gethui() or CoreGui
+    gui.Parent = parent
+
+    local win = Instance.new("Frame")
+    win.Name = "Main"
+    win.Size = UDim2.fromOffset(280, 380)
+    win.Position = UDim2.fromOffset(80, 120)
+    win.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    win.BorderSizePixel = 0
+    win.Active = true
+    win.ClipsDescendants = true
+    win.Parent = gui
+    Instance.new("UICorner", win).CornerRadius = UDim.new(0, 10)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(50, 50, 60)
+    stroke.Thickness = 1
+    stroke.Parent = win
+
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 36)
+    header.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    header.BorderSizePixel = 0
+    header.Parent = win
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -40, 1, 0)
+    title.Position = UDim2.fromOffset(12, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "ESP Settings"
+    title.TextColor3 = Color3.fromRGB(235, 238, 245)
+    title.TextSize = 14
+    title.Font = Enum.Font.GothamBold
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = header
+
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.fromOffset(28, 28)
+    close.Position = UDim2.new(1, -32, 0, 4)
+    close.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    close.Text = "X"
+    close.TextColor3 = Color3.fromRGB(200, 200, 210)
+    close.TextSize = 13
+    close.Font = Enum.Font.GothamBold
+    close.BorderSizePixel = 0
+    close.Parent = header
+    Instance.new("UICorner", close).CornerRadius = UDim.new(0, 6)
+
+    close.MouseButton1Click:Connect(function() win.Visible = false end)
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, -12, 1, -42)
+    scroll.Position = UDim2.fromOffset(6, 38)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 3
+    scroll.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 70)
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.Parent = win
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 4)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
+
+    local order = 0
+    local function makeSection(name)
+        order = order + 1
+        local f = Instance.new("Frame")
+        f.LayoutOrder = order
+        f.Size = UDim2.new(1, -8, 0, 22)
+        f.BackgroundTransparency = 1
+        f.Parent = scroll
+        local t = Instance.new("TextLabel")
+        t.Size = UDim2.new(1, 0, 1, 0)
+        t.BackgroundTransparency = 1
+        t.Text = name
+        t.TextColor3 = AEX_ACCENT or Color3.fromRGB(99,102,241)
+        t.TextSize = 12
+        t.Font = Enum.Font.GothamBold
+        t.TextXAlignment = Enum.TextXAlignment.Left
+        t.Parent = f
+    end
+
+    local function makeToggle(key, label)
+        order = order + 1
+        local f = Instance.new("Frame")
+        f.LayoutOrder = order
+        f.Size = UDim2.new(1, -8, 0, 28)
+        f.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+        f.BorderSizePixel = 0
+        f.Parent = scroll
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -60, 1, 0)
+        lbl.Position = UDim2.fromOffset(10, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = label
+        lbl.TextColor3 = Color3.fromRGB(200, 205, 215)
+        lbl.TextSize = 12
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = f
+
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.fromOffset(44, 20)
+        btn.Position = UDim2.new(1, -50, 0.5, -10)
+        btn.BackgroundColor3 = espConfig[key] and (AEX_ACCENT or Color3.fromRGB(99,102,241)) or Color3.fromRGB(55, 55, 65)
+        btn.BorderSizePixel = 0
+        btn.Text = ""
+        btn.Parent = f
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+
+        local knob = Instance.new("Frame")
+        knob.Size = UDim2.fromOffset(16, 16)
+        knob.Position = espConfig[key] and UDim2.new(1, -18, 0.5, -8) or UDim2.fromOffset(2, 2)
+        knob.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+        knob.BorderSizePixel = 0
+        knob.Parent = btn
+        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+        btn.MouseButton1Click:Connect(function()
+            aexespSet(key, not espConfig[key])
+            btn.BackgroundColor3 = espConfig[key] and (AEX_ACCENT or Color3.fromRGB(99,102,241)) or Color3.fromRGB(55, 55, 65)
+            knob:TweenPosition(espConfig[key] and UDim2.new(1, -18, 0.5, -8) or UDim2.fromOffset(2, 2), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+        end)
+    end
+
+    local function makeSlider(key, label, min, max, suffix)
+        order = order + 1
+        local f = Instance.new("Frame")
+        f.LayoutOrder = order
+        f.Size = UDim2.new(1, -8, 0, 36)
+        f.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+        f.BorderSizePixel = 0
+        f.Parent = scroll
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(0.5, 0, 0, 16)
+        lbl.Position = UDim2.fromOffset(10, 2)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = label
+        lbl.TextColor3 = Color3.fromRGB(200, 205, 215)
+        lbl.TextSize = 11
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = f
+
+        local val = Instance.new("TextLabel")
+        val.Size = UDim2.new(0.5, -10, 0, 16)
+        val.Position = UDim2.new(0.5, 0, 0, 2)
+        val.BackgroundTransparency = 1
+        val.Text = espConfig[key] .. suffix
+        val.TextColor3 = Color3.fromRGB(160, 165, 175)
+        val.TextSize = 11
+        val.Font = Enum.Font.GothamBold
+        val.TextXAlignment = Enum.TextXAlignment.Right
+        val.Parent = f
+
+        local track = Instance.new("Frame")
+        track.Size = UDim2.new(1, -20, 0, 6)
+        track.Position = UDim2.fromOffset(10, 22)
+        track.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+        track.BorderSizePixel = 0
+        track.Parent = f
+        Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.new((espConfig[key] - min) / (max - min), 0, 1, 0)
+        fill.BackgroundColor3 = AEX_ACCENT or Color3.fromRGB(99,102,241)
+        fill.BorderSizePixel = 0
+        fill.Parent = track
+        Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 1, 6)
+        btn.Position = UDim2.fromOffset(0, -3)
+        btn.BackgroundTransparency = 1
+        btn.Text = ""
+        btn.Parent = track
+
+        local dragging = false
+        btn.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(inp)
+            if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+                local rel = math.clamp((inp.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+                local nv = math.floor(min + rel * (max - min) + 0.5)
+                aexespSet(key, nv)
+                fill.Size = UDim2.new((espConfig[key] - min) / (max - min), 0, 1, 0)
+                val.Text = espConfig[key] .. suffix
+            end
+        end)
+    end
+
+    local function makeColorGrid()
+        order = order + 1
+        local f = Instance.new("Frame")
+        f.LayoutOrder = order
+        f.Size = UDim2.new(1, -8, 0, 44)
+        f.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+        f.BorderSizePixel = 0
+        f.Parent = scroll
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -80, 0, 16)
+        lbl.Position = UDim2.fromOffset(10, 2)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = "Color"
+        lbl.TextColor3 = Color3.fromRGB(200, 205, 215)
+        lbl.TextSize = 11
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = f
+
+        local preview = Instance.new("Frame")
+        preview.Size = UDim2.fromOffset(28, 28)
+        preview.Position = UDim2.new(1, -36, 0, 8)
+        preview.BackgroundColor3 = espConfig.color and Color3.fromRGB(espConfig.color[1], espConfig.color[2], espConfig.color[3]) or (AEX_ACCENT or Color3.fromRGB(99,102,241))
+        preview.BorderSizePixel = 0
+        preview.Parent = f
+        Instance.new("UICorner", preview).CornerRadius = UDim.new(0, 5)
+        Instance.new("UIStroke", preview).Color = Color3.fromRGB(60, 60, 70)
+
+        local grid = Instance.new("Frame")
+        grid.Size = UDim2.new(1, -80, 0, 20)
+        grid.Position = UDim2.fromOffset(10, 18)
+        grid.BackgroundTransparency = 1
+        grid.Parent = f
+        local gl = Instance.new("UIListLayout")
+        gl.FillDirection = Enum.FillDirection.Horizontal
+        gl.Padding = UDim.new(0, 3)
+        gl.Parent = grid
+
+        for i, c in ipairs(aexesp.presets) do
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.fromOffset(20, 20)
+            b.BackgroundColor3 = Color3.fromRGB(c[1], c[2], c[3])
+            b.BorderSizePixel = 0
+            b.Text = ""
+            b.Parent = grid
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+            b.MouseButton1Click:Connect(function()
+                aexespSet("color", c)
+                preview.BackgroundColor3 = Color3.fromRGB(c[1], c[2], c[3])
+            end)
+        end
+
+        local themeBtn = Instance.new("TextButton")
+        themeBtn.Size = UDim2.fromOffset(20, 20)
+        themeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        themeBtn.BorderSizePixel = 0
+        themeBtn.Text = ""
+        themeBtn.Parent = grid
+        Instance.new("UICorner", themeBtn).CornerRadius = UDim.new(0, 4)
+        local dot = Instance.new("Frame")
+        dot.Size = UDim2.fromOffset(8, 8)
+        dot.Position = UDim2.new(0.5, -4, 0.5, -4)
+        dot.BackgroundColor3 = AEX_ACCENT or Color3.fromRGB(99,102,241)
+        dot.BorderSizePixel = 0
+        dot.Parent = themeBtn
+        Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+        themeBtn.MouseButton1Click:Connect(function()
+            aexespSet("color", "theme")
+            preview.BackgroundColor3 = AEX_ACCENT or Color3.fromRGB(99,102,241)
+        end)
+    end
+
+    makeSection("Layers")
+    for _, t in ipairs(aexesp.toggles) do makeToggle(t[1], t[2]) end
+    makeSection("Range & Look")
+    for _, s in ipairs(aexesp.sliders) do makeSlider(s[1], s[2], s[3], s[4], s[5]) end
+    makeSection("Color")
+    makeColorGrid()
+
+    dragGUI(win)
+    aexesp.win = win
+end
+
+addcmd('espconfig',{'esps','visuals','espsettings','espui'},function() aexespToggleWindow() end)
+addcmd('espset',{'espvalue'},function(args)
+    if args[1] and args[2] then
+        aexespSet(args[1], args[2])
+        notify('ESP', args[1] .. ' = ' .. tostring(espConfig[args[1]]))
+    else
+        notify('ESP', 'Usage: espset <key> <value>')
+    end
+end)
+addcmd('espcolor',{'esprgb','espcolour'},function(args)
+    if #args >= 3 then
+        aexespSet('color', {tonumber(args[1]), tonumber(args[2]), tonumber(args[3])})
+    else
+        notify('ESP', 'Usage: espcolor <r> <g> <b>')
+    end
+end)
+addcmd('espdist',{'espmaxdist','esprange'},function(args)
+    if args[1] then aexespSet('maxdist', args[1]) notify('ESP', 'Max distance: ' .. espConfig.maxdist .. 'm') end
+end)
 function Locate(plr)
 	task.spawn(function()
 		for i,v in pairs(COREGUI:GetChildren()) do
