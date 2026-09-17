@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.6.1"
+currentVersion = "0.1.6.2"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -3762,7 +3762,7 @@ local function bindPrefixAction()
 				return Enum.ContextActionResult.Sink
 			end
 			return Enum.ContextActionResult.Pass
-		end, false, 2000, keyEnum)
+		end, false, 10000, keyEnum)
 		aexPrefixActionBound = true
 	end
 end
