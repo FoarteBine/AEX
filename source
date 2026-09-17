@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.6.2"
+currentVersion = "0.1.6.3"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -3726,10 +3726,16 @@ function CreateJoinLabel(plr,ID)
 end
 
 -- High-priority input binding for command bar prefix (overrides other scripts)
+local aexPrefixInputConn = nil
+
 local function bindPrefixAction()
 	if aexPrefixActionBound then
 		ContextActionService:UnbindAction("AEX_CommandBarOpen")
 		aexPrefixActionBound = false
+	end
+	if aexPrefixInputConn then
+		aexPrefixInputConn:Disconnect()
+		aexPrefixInputConn = nil
 	end
 	-- Special characters first (Enum.KeyCode[";"] throws error in Luau)
 	local specialMap = {
@@ -3754,6 +3760,7 @@ local function bindPrefixAction()
 		if ok then keyEnum = enum end
 	end
 	if keyEnum then
+		-- 1) ContextActionService with maximum priority + Sink
 		ContextActionService:BindActionAtPriority("AEX_CommandBarOpen", function(_, state)
 			if state == Enum.UserInputState.Begin then
 				RunService.RenderStepped:Wait()
@@ -3762,10 +3769,27 @@ local function bindPrefixAction()
 				return Enum.ContextActionResult.Sink
 			end
 			return Enum.ContextActionResult.Pass
-		end, false, 10000, keyEnum)
+		end, false, 100000, keyEnum)
 		aexPrefixActionBound = true
+
+		-- 2) Fallback: direct UserInputService listener (works even if other scripts use different systems)
+		aexPrefixInputConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+			if gameProcessed then return end
+			if input.KeyCode ~= keyEnum then return end
+			if UserInputService:GetFocusedTextBox() then return end
+			-- Debounce: prevent double-open if ContextActionService already handled
+			if aexPrefixActionHandled then return end
+			aexPrefixActionHandled = true
+			task.defer(function() aexPrefixActionHandled = false end)
+			RunService.RenderStepped:Wait()
+			Cmdbar:CaptureFocus()
+			maximizeHolder()
+		end)
 	end
 end
+
+local aexPrefixActionBound = false
+local aexPrefixActionHandled = false
 
 bindPrefixAction()
 
