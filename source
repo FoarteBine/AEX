@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.5.8"
+currentVersion = "0.1.5.9"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -3731,18 +3731,6 @@ AEXMouse.KeyDown:Connect(function(Key)
 		Cmdbar:CaptureFocus()
 		maximizeHolder()
 	end
-end)
-
--- Independent fallback when the prefix conflicts with another command bar.
--- Do not interrupt typing or consume another interface's processed input.
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if input.KeyCode ~= Enum.KeyCode.F8 or gameProcessed then return end
-	if UserInputService:GetFocusedTextBox() then return end
-	task.defer(function()
-		if UserInputService:GetFocusedTextBox() then return end
-		maximizeHolder()
-		Cmdbar:CaptureFocus()
-	end)
 end)
 
 local lastMinimizeReq = 0
