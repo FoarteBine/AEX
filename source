@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.5.6"
+currentVersion = "0.1.5.7"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -7649,7 +7649,8 @@ function aexespUpdate()
                 if espConfig.icons and head then
                     d.iconGui.Parent = head
                     d.iconGui.Adornee = head
-                    d.iconImg.ImageTransparency = op
+                    -- Drawing uses opacity; ImageLabel uses the inverse (1 = invisible).
+                    d.iconImg.ImageTransparency = 1 - op
                     d.iconImg.Image = aexespIconFor(hum)
                     d.iconGui.Enabled = true
                 else
