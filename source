@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.6.6"
+currentVersion = "0.1.6.7"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -3745,8 +3745,10 @@ local function closeKohlCommandBar()
 				obj:ReleaseFocus()
 				local parent = obj.Parent
 				while parent and parent ~= gui do
-					if parent:IsA("Frame") or parent:IsA("ScreenGui") then
+					if parent:IsA("Frame") then
 						parent.Visible = false
+					elseif parent:IsA("ScreenGui") then
+						parent.Enabled = false
 					end
 					parent = parent.Parent
 				end
