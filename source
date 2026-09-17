@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.5.9"
+currentVersion = "0.1.6.0"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -3725,12 +3725,52 @@ function CreateJoinLabel(plr,ID)
 	info2.Text = string.gsub(info2.Text, "Loading...",splitDates[2].."/"..splitDates[3].."/"..splitDates[1])
 end
 
-AEXMouse.KeyDown:Connect(function(Key)
-	if (Key==prefix) then
-		RunService.RenderStepped:Wait()
-		Cmdbar:CaptureFocus()
-		maximizeHolder()
+-- High-priority input binding for command bar prefix (overrides other scripts)
+local function bindPrefixAction()
+	if aexPrefixActionBound then
+		ContextActionService:UnbindAction("AEX_CommandBarOpen")
+		aexPrefixActionBound = false
 	end
+	local keyEnum = Enum.KeyCode[prefix:upper()]
+	if not keyEnum then
+		-- Fallback for special characters: Semicolon, Slash, Period, Comma, Quote, BackSlash, etc.
+		local specialMap = {
+			[";"] = Enum.KeyCode.Semicolon,
+			["/"] = Enum.KeyCode.Slash,
+			["."] = Enum.KeyCode.Period,
+			[","] = Enum.KeyCode.Comma,
+			["'"] = Enum.KeyCode.Quote,
+			["\\"] = Enum.KeyCode.BackSlash,
+			["["] = Enum.KeyCode.LeftBracket,
+			["]"] = Enum.KeyCode.RightBracket,
+			["-"] = Enum.KeyCode.Minus,
+			["="] = Enum.KeyCode.Equals,
+			["`"] = Enum.KeyCode.Backquote,
+		}
+		keyEnum = specialMap[prefix]
+	end
+	if keyEnum then
+		ContextActionService:BindActionAtPriority("AEX_CommandBarOpen", function(_, state)
+			if state == Enum.UserInputState.Begin then
+				RunService.RenderStepped:Wait()
+				Cmdbar:CaptureFocus()
+				maximizeHolder()
+				return Enum.ContextActionResult.Sink
+			end
+			return Enum.ContextActionResult.Pass
+		end, false, 2000, keyEnum)
+		aexPrefixActionBound = true
+	end
+end
+
+bindPrefixAction()
+
+-- Rebind when prefix changes
+PrefixBox:GetPropertyChangedSignal("Text"):Connect(function()
+	prefix = PrefixBox.Text
+	Cmdbar.PlaceholderText = "Command Bar ("..prefix..")"
+	updatesaves()
+	bindPrefixAction()
 end)
 
 local lastMinimizeReq = 0
