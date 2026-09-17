@@ -3731,23 +3731,27 @@ local function bindPrefixAction()
 		ContextActionService:UnbindAction("AEX_CommandBarOpen")
 		aexPrefixActionBound = false
 	end
-	local keyEnum = Enum.KeyCode[prefix:upper()]
+	-- Special characters first (Enum.KeyCode[";"] throws error in Luau)
+	local specialMap = {
+		[";"] = Enum.KeyCode.Semicolon,
+		["/"] = Enum.KeyCode.Slash,
+		["."] = Enum.KeyCode.Period,
+		[","] = Enum.KeyCode.Comma,
+		["'"] = Enum.KeyCode.Quote,
+		["\\"] = Enum.KeyCode.BackSlash,
+		["["] = Enum.KeyCode.LeftBracket,
+		["]"] = Enum.KeyCode.RightBracket,
+		["-"] = Enum.KeyCode.Minus,
+		["="] = Enum.KeyCode.Equals,
+		["`"] = Enum.KeyCode.Backquote,
+	}
+	local keyEnum = specialMap[prefix]
 	if not keyEnum then
-		-- Fallback for special characters: Semicolon, Slash, Period, Comma, Quote, BackSlash, etc.
-		local specialMap = {
-			[";"] = Enum.KeyCode.Semicolon,
-			["/"] = Enum.KeyCode.Slash,
-			["."] = Enum.KeyCode.Period,
-			[","] = Enum.KeyCode.Comma,
-			["'"] = Enum.KeyCode.Quote,
-			["\\"] = Enum.KeyCode.BackSlash,
-			["["] = Enum.KeyCode.LeftBracket,
-			["]"] = Enum.KeyCode.RightBracket,
-			["-"] = Enum.KeyCode.Minus,
-			["="] = Enum.KeyCode.Equals,
-			["`"] = Enum.KeyCode.Backquote,
-		}
-		keyEnum = specialMap[prefix]
+		-- Letters, numbers, F-keys, etc.
+		local upper = prefix:upper()
+		-- Use pcall because Enum.KeyCode["Invalid"] throws
+		local ok, enum = pcall(function() return Enum.KeyCode[upper] end)
+		if ok then keyEnum = enum end
 	end
 	if keyEnum then
 		ContextActionService:BindActionAtPriority("AEX_CommandBarOpen", function(_, state)
