@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.6.3"
+currentVersion = "0.1.6.4"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -3727,6 +3727,7 @@ end
 
 -- High-priority input binding for command bar prefix (overrides other scripts)
 local aexPrefixInputConn = nil
+local aexCurrentKeyEnum = nil
 
 local function bindPrefixAction()
 	if aexPrefixActionBound then
@@ -3759,6 +3760,7 @@ local function bindPrefixAction()
 		local ok, enum = pcall(function() return Enum.KeyCode[upper] end)
 		if ok then keyEnum = enum end
 	end
+	aexCurrentKeyEnum = keyEnum
 	if keyEnum then
 		-- 1) ContextActionService with maximum priority + Sink
 		ContextActionService:BindActionAtPriority("AEX_CommandBarOpen", function(_, state)
@@ -3786,12 +3788,43 @@ local function bindPrefixAction()
 			maximizeHolder()
 		end)
 	end
+	startPrefixPoll()
 end
 
 local aexPrefixActionBound = false
 local aexPrefixActionHandled = false
+local aexPrefixPollConn = nil
+local aexCurrentKeyEnum = nil
+local aexPrefixPollWasDown = false
+
+local function startPrefixPoll()
+	if aexPrefixPollConn then
+		aexPrefixPollConn:Disconnect()
+		aexPrefixPollConn = nil
+	end
+	if not aexCurrentKeyEnum then return end
+	aexPrefixPollConn = RunService.Heartbeat:Connect(function()
+		if UserInputService:IsKeyDown(aexCurrentKeyEnum) then
+			if not aexPrefixPollWasDown then
+				aexPrefixPollWasDown = true
+				if not UserInputService:GetFocusedTextBox() then
+					if not aexPrefixActionHandled then
+						aexPrefixActionHandled = true
+						task.defer(function() aexPrefixActionHandled = false end)
+						RunService.RenderStepped:Wait()
+						Cmdbar:CaptureFocus()
+						maximizeHolder()
+					end
+				end
+			end
+		else
+			aexPrefixPollWasDown = false
+		end
+	end)
+end
 
 bindPrefixAction()
+startPrefixPoll()
 
 -- Rebind when prefix changes
 PrefixBox:GetPropertyChangedSignal("Text"):Connect(function()
