@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.6.5"
+currentVersion = "0.1.6.6"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -3732,6 +3732,30 @@ local aexPrefixActionBound = false
 local aexPrefixActionHandled = false
 local aexPrefixPollConn = nil
 local aexPrefixPollWasDown = false
+local aexKohlCheckConn = nil
+
+local function closeKohlCommandBar()
+	-- Try to find and close Kohl Admin's command bar
+	local coreGui = game:GetService("CoreGui")
+	local playerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+	local function tryClose(gui)
+		if not gui then return end
+		for _, obj in pairs(gui:GetDescendants()) do
+			if obj:IsA("TextBox") and (obj.Name:lower():find("command") or obj.Name:lower():find("kohl") or obj.PlaceholderText:lower():find("command")) then
+				obj:ReleaseFocus()
+				local parent = obj.Parent
+				while parent and parent ~= gui do
+					if parent:IsA("Frame") or parent:IsA("ScreenGui") then
+						parent.Visible = false
+					end
+					parent = parent.Parent
+				end
+			end
+		end
+	end
+	tryClose(coreGui)
+	tryClose(playerGui)
+end
 
 local function startPrefixPoll()
 	if aexPrefixPollConn then
@@ -3750,6 +3774,8 @@ local function startPrefixPoll()
 						RunService.RenderStepped:Wait()
 						Cmdbar:CaptureFocus()
 						maximizeHolder()
+						-- After a short delay, try to close Kohl's bar if it stole focus
+						task.delay(0.05, closeKohlCommandBar)
 					end
 				end
 			end
@@ -3792,16 +3818,18 @@ local function bindPrefixAction()
 	end
 	aexCurrentKeyEnum = keyEnum
 	if keyEnum then
-		-- 1) ContextActionService with maximum priority + Sink
+		-- 1) ContextActionService with MAXIMUM priority + Sink
 		ContextActionService:BindActionAtPriority("AEX_CommandBarOpen", function(_, state)
 			if state == Enum.UserInputState.Begin then
 				RunService.RenderStepped:Wait()
 				Cmdbar:CaptureFocus()
 				maximizeHolder()
+				-- After a short delay, try to close Kohl's bar if it stole focus
+				task.delay(0.05, closeKohlCommandBar)
 				return Enum.ContextActionResult.Sink
 			end
 			return Enum.ContextActionResult.Pass
-		end, false, 100000, keyEnum)
+		end, false, 2147483647, keyEnum)
 		aexPrefixActionBound = true
 
 		-- 2) Fallback: direct UserInputService listener (works even if other scripts use different systems)
@@ -3816,6 +3844,7 @@ local function bindPrefixAction()
 			RunService.RenderStepped:Wait()
 			Cmdbar:CaptureFocus()
 			maximizeHolder()
+			task.delay(0.05, closeKohlCommandBar)
 		end)
 	end
 	startPrefixPoll()
