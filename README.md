@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://media.discordapp.net/attachments/1477727929852235909/1548710311962611845/aex.jpg?ex=6aa8b520&is=6aa763a0&hm=20d20f63cd7adbf3862c458cf9695616884444bfcf6a1110c7046401009be4d2&=&format=webp" alt="AEX Logo" width="290" style="border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);" />
+  <img src="https://raw.githubusercontent.com/FoarteBine/AEX/refs/heads/main/assets/aex.jpg.webp" alt="AEX Logo" width="290" style="border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);" />
   <h1> AEX </h1>
   <p><b>Next-Gen Expansion Framework for Infinity Yield.</b></p>
   
