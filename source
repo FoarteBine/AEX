@@ -13261,7 +13261,7 @@ addcmd('invisible',{'invis'},function(args, speaker)
 
 	invisSeat = Instance.new("Seat")
 	invisSeat.Name = "invischair"
-	invisSeat.Anchored = false
+	invisSeat.Anchored = true
 	invisSeat.CanCollide = false
 	invisSeat.Transparency = 1
 	invisSeat.Position = hidePos
@@ -13276,15 +13276,6 @@ addcmd('invisible',{'invis'},function(args, speaker)
 	invisSeat.CFrame = savedCFrame
 
 	setTransparency(0.5)
-
-	invisConn = RunService.Heartbeat:Connect(function()
-		if not invisSeat or not Player.Character then return end
-		local curHRP = Player.Character:FindFirstChild("HumanoidRootPart")
-		if curHRP then
-			local pos = curHRP.Position
-			invisSeat.CFrame = CFrame.new(pos.X, -500, pos.Z) * CFrame.Angles(0, curHRP.Orientation.Y, 0)
-		end
-	end)
 
 	if hum then
 		invisHRPConn = hum.Died:Connect(function()
