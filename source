@@ -13202,9 +13202,9 @@ addcmd('invisible',{'invis'},function(args, speaker)
 	local IsInvis = false
 	local IsRunning = true
 	local InvisibleCharacter = Character:Clone()
-	InvisibleCharacter.Parent = Lighting
-	local Void = workspace.FallenPartsDestroyHeight
+	InvisibleCharacter.Parent = workspace
 	InvisibleCharacter.Name = ""
+	local Void = workspace.FallenPartsDestroyHeight
 	local CF
 
 	local invisFix = RunService.Stepped:Connect(function()
@@ -13247,21 +13247,28 @@ addcmd('invisible',{'invis'},function(args, speaker)
 		IsRunning = false
 		if IsInvis == true then
 			pcall(function()
-				Player.Character = Character
-				wait()
-				Character.Parent = workspace
-				Character:FindFirstChildWhichIsA'Humanoid':Destroy()
-				IsInvis = false
-				InvisibleCharacter.Parent = nil
-				invisRunning = false
+			 Player.Character = Character
+			 wait()
+			 -- Move original back to workspace near player
+			 Character.Parent = workspace
+			 local hrp0 = Character:FindFirstChild("HumanoidRootPart")
+			 if hrp0 then hrp0.Anchored = false end
+			 Character.Humanoid.PlatformStand = false
+			Character:FindFirstChildWhichIsA'Humanoid':Destroy()
+			IsInvis = false
+			InvisibleCharacter:Destroy()
+			invisRunning = false
 			end)
 		elseif IsInvis == false then
 			pcall(function()
-				Player.Character = Character
-				wait()
-				Character.Parent = workspace
-				Character:FindFirstChildWhichIsA'Humanoid':Destroy()
-				TurnVisible()
+			Player.Character = Character
+			wait()
+			Character.Parent = workspace
+			local hrp0 = Character:FindFirstChild("HumanoidRootPart")
+			if hrp0 then hrp0.Anchored = false end
+			Character.Humanoid.PlatformStand = false
+			Character:FindFirstChildWhichIsA'Humanoid':Destroy()
+			TurnVisible()
 			end)
 		end
 	end
@@ -13281,9 +13288,14 @@ addcmd('invisible',{'invis'},function(args, speaker)
 	wait(.2)
 	workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
 	InvisibleCharacter = InvisibleCharacter
-	Character.Parent = Lighting
-	InvisibleCharacter.Parent = workspace
-	InvisibleCharacter.Humanoid.RootPart.CFrame = CF_1
+	-- Keep original in workspace under the map to preserve streaming
+	local hrp = Character:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		hrp.Anchored = true
+		hrp.CFrame = CFrame.new(hrp.Position.X, -500, hrp.Position.Z)
+	end
+	Character.Humanoid.PlatformStand = true
+	InvisibleCharacter.HumanoidRootPart.CFrame = CF_1
 	Player.Character = InvisibleCharacter
 	execCmd('fixcam')
 	Player.Character.Animate.Disabled = true
@@ -13297,6 +13309,13 @@ addcmd('invisible',{'invis'},function(args, speaker)
 		Character = Character
 		local CF_1 = Player.Character.Humanoid.RootPart.CFrame
 		Character.Humanoid.RootPart.CFrame = CF_1
+		-- Un-anchor original and restore it on the map
+		local hrp0 = Character:FindFirstChild("HumanoidRootPart")
+		if hrp0 then
+			hrp0.Anchored = false
+			hrp0.CFrame = CF_1
+		end
+		Character.Humanoid.PlatformStand = false
 		InvisibleCharacter:Destroy()
 		Player.Character = Character
 		Character.Parent = workspace
