@@ -13283,12 +13283,7 @@ addcmd('invisible',{'invis'},function(args, speaker)
 	IsInvis = true
 	CF = workspace.CurrentCamera.CFrame
 	local CF_1 = Player.Character.Humanoid.RootPart.CFrame
-	Character:MoveTo(Vector3.new(0,math.pi*1000000,0))
-	workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
-	wait(.2)
-	workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-	InvisibleCharacter = InvisibleCharacter
-	-- Keep original in workspace under the map to preserve streaming
+	-- Keep original in workspace under ground to preserve streaming, sync with clone
 	local hrp = Character:FindFirstChild("HumanoidRootPart")
 	if hrp then
 		hrp.Anchored = true
@@ -13301,25 +13296,40 @@ addcmd('invisible',{'invis'},function(args, speaker)
 	Player.Character.Animate.Disabled = true
 	Player.Character.Animate.Disabled = false
 
+	-- Sync original under ground with clone position (XZ only)
+	local invisSync = RunService.Heartbeat:Connect(function()
+		local cloneHRP = InvisibleCharacter and InvisibleCharacter:FindFirstChild("HumanoidRootPart")
+		local origHRP = Character and Character:FindFirstChild("HumanoidRootPart")
+		if cloneHRP and origHRP then
+			local cPos = cloneHRP.Position
+			origHRP.CFrame = CFrame.new(cPos.X, -500, cPos.Z) * CFrame.fromOrientation(cloneHRP.Orientation.X, cloneHRP.Orientation.Y, cloneHRP.Orientation.Z)
+		end
+	end)
+
 	function TurnVisible()
 		if IsInvis == false then return end
+		if invisSync then invisSync:Disconnect() end
 		invisFix:Disconnect()
 		invisDied:Disconnect()
-		CF = workspace.CurrentCamera.CFrame
-		Character = Character
-		local CF_1 = Player.Character.Humanoid.RootPart.CFrame
-		Character.Humanoid.RootPart.CFrame = CF_1
-		-- Un-anchor original and restore it on the map
+		local cam = workspace.CurrentCamera
+		local cloneHRP = InvisibleCharacter and InvisibleCharacter:FindFirstChild("HumanoidRootPart")
+		local CF_1 = cloneHRP and cloneHRP.CFrame or CFrame.new()
+		-- Un-anchor original and restore it at clone position
 		local hrp0 = Character:FindFirstChild("HumanoidRootPart")
 		if hrp0 then
 			hrp0.Anchored = false
 			hrp0.CFrame = CF_1
 		end
 		Character.Humanoid.PlatformStand = false
+		Character.Humanoid.AutoRotate = true
 		InvisibleCharacter:Destroy()
 		Player.Character = Character
 		Character.Parent = workspace
 		IsInvis = false
+		if cam then
+			cam.CameraSubject = Character:FindFirstChildOfClass("Humanoid")
+			cam.CameraType = Enum.CameraType.Custom
+		end
 		Player.Character.Animate.Disabled = true
 		Player.Character.Animate.Disabled = false
 		invisDied = Character:FindFirstChildOfClass'Humanoid'.Died:Connect(function()
