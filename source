@@ -13194,150 +13194,129 @@ invisRunning = false
 addcmd('invisible',{'invis'},function(args, speaker)
 	if invisRunning then return end
 	invisRunning = true
-	-- Full credit to AmokahFox @V3rmillion
 	local Player = speaker
 	repeat wait(.1) until Player.Character
 	local Character = Player.Character
 	Character.Archivable = true
 	local IsInvis = false
-	local IsRunning = true
-	local InvisibleCharacter = Character:Clone()
-	InvisibleCharacter.Parent = workspace
-	InvisibleCharacter.Name = ""
-	local Void = workspace.FallenPartsDestroyHeight
-	local CF
+	local invisSeat, invisWeld, invisConn, invisHRPConn
+	local originalTransparency = {}
 
-	local invisFix = RunService.Stepped:Connect(function()
+	local function setTransparency(trans)
+		for _, d in pairs(Character:GetDescendants()) do
+			if d:IsA("BasePart") or d:IsA("Decal") then
+				if not originalTransparency[d] then originalTransparency[d] = d.Transparency end
+				d.Transparency = trans
+			end
+		end
+	end
+
+	local function clearSeat()
+		pcall(function() if invisWeld then invisWeld:Destroy() end end)
+		pcall(function() if invisSeat then invisSeat:Destroy() end end)
+		invisWeld, invisSeat = nil, nil
+	end
+
+	local function Respawn()
 		pcall(function()
-			local IsInteger
-			if tostring(Void):find'-' then
-				IsInteger = true
-			else
-				IsInteger = false
+			if invisConn then invisConn:Disconnect() end
+			if invisHRPConn then invisHRPConn:Disconnect() end
+			clearSeat()
+			for obj, tr in pairs(originalTransparency) do
+				if obj and obj.Parent then pcall(function() obj.Transparency = tr end) end
 			end
-			local Pos = Player.Character.Humanoid.RootPart.Position
-			local Pos_String = tostring(Pos)
-			local Pos_Seperate = Pos_String:split(', ')
-			local X = tonumber(Pos_Seperate[1])
-			local Y = tonumber(Pos_Seperate[2])
-			local Z = tonumber(Pos_Seperate[3])
-			if IsInteger == true then
-				if Y <= Void then
-					Respawn()
-				end
-			elseif IsInteger == false then
-				if Y >= Void then
-					Respawn()
-				end
-			end
-		end)
-	end)
-
-	for i,v in pairs(InvisibleCharacter:GetDescendants())do
-		if v:IsA("BasePart") then
-			if v.Name == "HumanoidRootPart" then
-				v.Transparency = 1
-			else
-				v.Transparency = .5
-			end
-		end
-	end
-
-	function Respawn()
-		IsRunning = false
-		if IsInvis == true then
-			pcall(function()
-			 Player.Character = Character
-			 wait()
-			 -- Move original back to workspace near player
-			 Character.Parent = workspace
-			 local hrp0 = Character:FindFirstChild("HumanoidRootPart")
-			 if hrp0 then hrp0.Anchored = false end
-			 Character.Humanoid.PlatformStand = false
-			Character:FindFirstChildWhichIsA'Humanoid':Destroy()
-			IsInvis = false
-			InvisibleCharacter:Destroy()
-			invisRunning = false
-			end)
-		elseif IsInvis == false then
-			pcall(function()
+			originalTransparency = {}
 			Player.Character = Character
-			wait()
 			Character.Parent = workspace
-			local hrp0 = Character:FindFirstChild("HumanoidRootPart")
-			if hrp0 then hrp0.Anchored = false end
-			Character.Humanoid.PlatformStand = false
-			Character:FindFirstChildWhichIsA'Humanoid':Destroy()
-			TurnVisible()
-			end)
-		end
+			local hrp = Character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				hrp.Anchored = false
+				hrp.AssemblyLinearVelocity = Vector3.zero
+				hrp.AssemblyAngularVelocity = Vector3.zero
+			end
+			local hum = Character:FindFirstChildOfClass'Humanoid'
+			if hum then
+				hum.PlatformStand = false
+				hum.AutoRotate = true
+			end
+			IsInvis = false
+			invisRunning = false
+		end)
 	end
 
-	local invisDied
-	invisDied = InvisibleCharacter:FindFirstChildOfClass'Humanoid'.Died:Connect(function()
-		Respawn()
-		invisDied:Disconnect()
-	end)
+	local hum = Character:FindFirstChildOfClass'Humanoid'
+	if hum then pcall(function() hum.Died:Connect(Respawn) end) end
 
 	if IsInvis == true then return end
 	IsInvis = true
-	CF = workspace.CurrentCamera.CFrame
-	local CF_1 = Player.Character.Humanoid.RootPart.CFrame
-	-- Keep original in workspace under ground to preserve streaming, sync with clone
 	local hrp = Character:FindFirstChild("HumanoidRootPart")
-	if hrp then
-		hrp.Anchored = true
-		hrp.CFrame = CFrame.new(hrp.Position.X, -500, hrp.Position.Z)
-	end
-	Character.Humanoid.PlatformStand = true
-	InvisibleCharacter.HumanoidRootPart.CFrame = CF_1
-	Player.Character = InvisibleCharacter
-	execCmd('fixcam')
-	Player.Character.Animate.Disabled = true
-	Player.Character.Animate.Disabled = false
+	if not hrp then return end
+	local savedCFrame = hrp.CFrame
+	local torso = Character:FindFirstChild("Torso") or Character:FindFirstChild("UpperTorso")
+	if not torso then return end
 
-	-- Sync original under ground with clone position (XZ only)
-	local invisSync = RunService.Heartbeat:Connect(function()
-		local cloneHRP = InvisibleCharacter and InvisibleCharacter:FindFirstChild("HumanoidRootPart")
-		local origHRP = Character and Character:FindFirstChild("HumanoidRootPart")
-		if cloneHRP and origHRP then
-			local cPos = cloneHRP.Position
-			origHRP.CFrame = CFrame.new(cPos.X, -500, cPos.Z) * CFrame.fromOrientation(cloneHRP.Orientation.X, cloneHRP.Orientation.Y, cloneHRP.Orientation.Z)
+	local hidePos = Vector3.new(-25.95, 84, 3537.55)
+	Character:MoveTo(hidePos)
+	task.wait(0.15)
+
+	invisSeat = Instance.new("Seat")
+	invisSeat.Name = "invischair"
+	invisSeat.Anchored = false
+	invisSeat.CanCollide = false
+	invisSeat.Transparency = 1
+	invisSeat.Position = hidePos
+	invisSeat.Parent = workspace
+
+	invisWeld = Instance.new("Weld")
+	invisWeld.Part0 = invisSeat
+	invisWeld.Part1 = torso
+	invisWeld.Parent = invisSeat
+
+	task.wait()
+	invisSeat.CFrame = savedCFrame
+
+	setTransparency(0.5)
+
+	invisConn = RunService.Heartbeat:Connect(function()
+		if not invisSeat or not Player.Character then return end
+		local curHRP = Player.Character:FindFirstChild("HumanoidRootPart")
+		if curHRP then
+			local pos = curHRP.Position
+			invisSeat.CFrame = CFrame.new(pos.X, -500, pos.Z) * CFrame.Angles(0, curHRP.Orientation.Y, 0)
 		end
 	end)
 
+	if hum then
+		invisHRPConn = hum.Died:Connect(function()
+			Respawn()
+		end)
+	end
+
 	function TurnVisible()
 		if IsInvis == false then return end
-		if invisSync then invisSync:Disconnect() end
-		invisFix:Disconnect()
-		invisDied:Disconnect()
-		local cam = workspace.CurrentCamera
-		local cloneHRP = InvisibleCharacter and InvisibleCharacter:FindFirstChild("HumanoidRootPart")
-		local CF_1 = cloneHRP and cloneHRP.CFrame or CFrame.new()
-		-- Un-anchor original and restore it at clone position
-		local hrp0 = Character:FindFirstChild("HumanoidRootPart")
-		if hrp0 then
-			hrp0.Anchored = false
-			hrp0.CFrame = CF_1
-		end
-		Character.Humanoid.PlatformStand = false
-		Character.Humanoid.AutoRotate = true
-		InvisibleCharacter:Destroy()
-		Player.Character = Character
-		Character.Parent = workspace
-		IsInvis = false
-		if cam then
-			cam.CameraSubject = Character:FindFirstChildOfClass("Humanoid")
-			cam.CameraType = Enum.CameraType.Custom
-		end
-		Player.Character.Animate.Disabled = true
-		Player.Character.Animate.Disabled = false
-		invisDied = Character:FindFirstChildOfClass'Humanoid'.Died:Connect(function()
-			Respawn()
-			invisDied:Disconnect()
+		pcall(function()
+			if invisConn then invisConn:Disconnect() end
+			if invisHRPConn then invisHRPConn:Disconnect() end
+			clearSeat()
+			setTransparency(0)
+			originalTransparency = {}
+			local cam = workspace.CurrentCamera
+			if cam then
+				cam.CameraSubject = Character:FindFirstChildOfClass("Humanoid")
+				cam.CameraType = Enum.CameraType.Custom
+			end
+			local hum2 = Character:FindFirstChildOfClass'Humanoid'
+			if hum2 then
+				hum2.PlatformStand = false
+				hum2.AutoRotate = true
+			end
+			local hrp0 = Character:FindFirstChild("HumanoidRootPart")
+			if hrp0 then hrp0.Anchored = false end
+			IsInvis = false
+			invisRunning = false
 		end)
-		invisRunning = false
 	end
+
 	notify('Invisible','You now appear invisible to other players')
 end)
 
