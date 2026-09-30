@@ -5990,6 +5990,8 @@ CMDs[#CMDs + 1] = {NAME = 'respawn', DESC = 'Respawns you'}
 CMDs[#CMDs + 1] = {NAME = 'refresh / re', DESC = 'Respawns and brings you back to the same position'}
 CMDs[#CMDs + 1] = {NAME = 'god', DESC = 'Makes your character difficult to kill in most games'}
 CMDs[#CMDs + 1] = {NAME = 'invisible / invis', DESC = 'Makes you invisible to other players'}
+CMDs[#CMDs + 1] = {NAME = 'brickgod / bgod', DESC = 'Disables killbricks around you (CanTouch off)'}
+CMDs[#CMDs + 1] = {NAME = 'unbrickgod / unbgod', DESC = 'Re-enables killbricks around you (CanTouch on)'}
 CMDs[#CMDs + 1] = {NAME = 'visible / vis', DESC = 'Makes you visible to other players'}
 CMDs[#CMDs + 1] = {NAME = 'toolinvisible / toolinvis / tinvis', DESC = 'Makes you invisible to other players and able to use tools'}
 CMDs[#CMDs + 1] = {NAME = 'speed / ws / walkspeed [num]', DESC = 'Change your walkspeed (default is 16)'}
@@ -12689,8 +12691,10 @@ addcmd("goto", {"to"}, function(args, speaker)
 	for _, name in getPlayer(args[1], speaker) do
 		local targetCharacter = Players[name].Character
 		if targetCharacter ~= nil then
+			local targetRoot = targetCharacter:FindFirstChild("HumanoidRootPart")
 			local targetPivot = targetCharacter:GetPivot()
-			local targetPosition = targetPivot.Position
+			-- prefer HRP position; fall back to the character model's WorldPivot when no root part found
+			local targetPosition = targetRoot and targetRoot.Position or targetPivot.Position
 
 			if waitForStream and workspace.StreamingEnabled then
 				task.spawn(speaker.RequestStreamAroundAsync, speaker, targetPosition, 5)
@@ -13313,6 +13317,45 @@ end)
 
 addcmd("toggleinvis", {}, function(args, speaker)
 	execCmd(invisRunning and "visible" or "invisible")
+end)
+
+-- Killbrick immunity: force CanTouch off on parts near the player (from brickgodmove.lua)
+brickgodRunning = false
+local brickgodConn
+
+addcmd('brickgod',{'bgod','brickgodmode'},function(args, speaker)
+	if brickgodRunning then return end
+	brickgodRunning = true
+	local player = speaker
+	local function apply()
+		local ch = player.Character
+		if not ch then return end
+		local hrp = ch:FindFirstChild("HumanoidRootPart")
+		if not hrp then return end
+		local parts = workspace:GetPartBoundsInRadius(hrp.Position, 10)
+		for _, part in ipairs(parts) do
+			part.CanTouch = false
+		end
+	end
+	brickgodConn = RunService.Stepped:Connect(apply)
+	apply()
+	notify('BrickGod','Killbricks within 10 studs disabled (CanTouch off)')
+end)
+
+addcmd('unbrickgod',{'unbgod','brickgodoff'},function(args, speaker)
+	if not brickgodRunning then return end
+	brickgodRunning = false
+	if brickgodConn then brickgodConn:Disconnect() brickgodConn = nil end
+	local ch = speaker.Character
+	if ch then
+		local hrp = ch:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			for _, part in ipairs(workspace:GetPartBoundsInRadius(hrp.Position, 10)) do
+				part.CanTouch = true
+			end
+		end
+	end
+	notify('BrickGod','Killbricks restored (CanTouch on)')
 end)
 
 addcmd('toolinvisible',{'toolinvis','tinvis'},function(args, speaker)
