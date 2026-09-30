@@ -6094,6 +6094,8 @@ CMDs[#CMDs + 1] = {NAME = 'unlockcursor / unlockmouse / umouse', DESC = 'Unlocks
 CMDs[#CMDs + 1] = {NAME = 'lockcursor / centercursor', DESC = 'Locks the mouse cursor to the center of the screen'}
 CMDs[#CMDs + 1] = {NAME = 'defaultcursor / dcursor', DESC = 'Forces the Roblox default cursor (unlocks it and clears the cursor icon)'}
 CMDs[#CMDs + 1] = {NAME = 'gamecursor / gcursor', DESC = 'Reverts AEX cursor changes back to what the game had'}
+CMDs[#CMDs + 1] = {NAME = 'incognito / incog / guestmode [name]', DESC = 'Shows a fake name instead of yours locally (random Guest 1-9999, or your argument)'}
+CMDs[#CMDs + 1] = {NAME = 'unincognito / unincog / realname', DESC = 'Restores your real name after incognito'}
 CMDs[#CMDs + 1] = {NAME = 'clickdelete', DESC = 'Go to Settings > Keybinds > Add for click delete'}
 CMDs[#CMDs + 1] = {NAME = 'clickteleport', DESC = 'Go to Settings > Keybinds > Add for click teleport'}
 CMDs[#CMDs + 1] = {NAME = 'mouseteleport / mousetp', DESC = 'Teleports your character to your mouse. This is recommended as a keybind'}
@@ -9606,13 +9608,15 @@ addcmd('serverinfo',{'info','sinfo'},function(args, speaker)
 		local CopyPlrID = Instance.new("TextButton")
 		local CopyPlcID = Instance.new("TextButton")
 		local CopyPlcName = Instance.new("TextButton")
+		local jobid = Instance.new("TextLabel")
+		local CopyJobID = Instance.new("TextButton")
 
 		FRAME.Name = randomString()
 		FRAME.Parent = ScaledHolder
 		FRAME.Active = true
 		FRAME.BackgroundTransparency = 1
-		FRAME.Position = UDim2.new(0.5, -130, 0, -500)
-		FRAME.Size = UDim2.new(0, 250, 0, 20)
+		FRAME.Position = UDim2.new(0.5, -165, 0, -500)
+		FRAME.Size = UDim2.new(0, 330, 0, 20)
 		FRAME.ZIndex = 10
 		dragGUI(FRAME)
 
@@ -9620,7 +9624,7 @@ addcmd('serverinfo',{'info','sinfo'},function(args, speaker)
 		shadow.Parent = FRAME
 		shadow.BackgroundColor3 = currentShade2
 		shadow.BorderSizePixel = 0
-		shadow.Size = UDim2.new(0, 250, 0, 20)
+		shadow.Size = UDim2.new(0, 330, 0, 20)
 		shadow.ZIndex = 10
 		table.insert(shade2,shadow)
 
@@ -9658,7 +9662,7 @@ addcmd('serverinfo',{'info','sinfo'},function(args, speaker)
 		background.BackgroundColor3 = currentShade1
 		background.BorderSizePixel = 0
 		background.Position = UDim2.new(0, 0, 1, 0)
-		background.Size = UDim2.new(0, 250, 0, 250)
+		background.Size = UDim2.new(0, 330, 0, 285)
 		background.ZIndex = 10
 		table.insert(shade1,background)
 
@@ -9750,8 +9754,8 @@ addcmd('serverinfo',{'info','sinfo'},function(args, speaker)
 		name.Parent = background
 		name.BackgroundTransparency = 1
 		name.BorderSizePixel = 0
-		name.Position = UDim2.new(0, 5, 0, 215)
-		name.Size = UDim2.new(0, 240, 0, 30)
+		name.Position = UDim2.new(0, 5, 0, 240)
+		name.Size = UDim2.new(0, 320, 0, 30)
 		name.ZIndex = 10
 		name.Font = Enum.Font.Gotham
 		name.FontSize = Enum.FontSize.Size14
@@ -9850,7 +9854,7 @@ addcmd('serverinfo',{'info','sinfo'},function(args, speaker)
 		CopyPlcName.Parent = background
 		CopyPlcName.BackgroundColor3 = currentShade2
 		CopyPlcName.BorderSizePixel = 0
-		CopyPlcName.Position = UDim2.new(0, 210, 0, 215)
+		CopyPlcName.Position = UDim2.new(0, 290, 0, 240)
 		CopyPlcName.Size = UDim2.new(0, 35, 0, 20)
 		CopyPlcName.Font = Enum.Font.Gotham
 		CopyPlcName.TextSize = 14
@@ -9860,11 +9864,40 @@ addcmd('serverinfo',{'info','sinfo'},function(args, speaker)
 		table.insert(shade2,CopyPlcName)
 		table.insert(text1,CopyPlcName)
 
+		jobid.Name = "jobid"
+		jobid.Parent = background
+		jobid.BackgroundTransparency = 1
+		jobid.BorderSizePixel = 0
+		jobid.Position = UDim2.new(0, 5, 0, 215)
+		jobid.Size = UDim2.new(0, 280, 0, 20)
+		jobid.ZIndex = 10
+		jobid.Font = Enum.Font.Gotham
+		jobid.FontSize = Enum.FontSize.Size14
+		jobid.Text = "Job ID: LOADING"
+		jobid.TextColor3 = currentText1
+		jobid.TextXAlignment = Enum.TextXAlignment.Left
+		jobid.TextTruncate = Enum.TextTruncate.AtEnd
+		table.insert(text1,jobid)
+
+		CopyJobID.Name = "CopyJobID"
+		CopyJobID.Parent = background
+		CopyJobID.BackgroundColor3 = currentShade2
+		CopyJobID.BorderSizePixel = 0
+		CopyJobID.Position = UDim2.new(0, 290, 0, 215)
+		CopyJobID.Size = UDim2.new(0, 35, 0, 20)
+		CopyJobID.Font = Enum.Font.Gotham
+		CopyJobID.TextSize = 14
+		CopyJobID.Text = "Copy"
+		CopyJobID.TextColor3 = currentText1
+		CopyJobID.ZIndex = 10
+		table.insert(shade2,CopyJobID)
+		table.insert(text1,CopyJobID)
+
 		local SINFOGUI = background
-		FRAME:TweenPosition(UDim2.new(0.5, -130, 0, 100), "InOut", "Quart", 0.5, true, nil) 
+		FRAME:TweenPosition(UDim2.new(0.5, -165, 0, 100), "InOut", "Quart", 0.5, true, nil) 
 		wait(0.5)
 		Exit.MouseButton1Click:Connect(function()
-			FRAME:TweenPosition(UDim2.new(0.5, -130, 0, -500), "InOut", "Quart", 0.5, true, nil) 
+			FRAME:TweenPosition(UDim2.new(0.5, -165, 0, -500), "InOut", "Quart", 0.5, true, nil) 
 			wait(0.6)
 			FRAME:Destroy()
 			canOpenServerinfo = true
@@ -9874,6 +9907,7 @@ addcmd('serverinfo',{'info','sinfo'},function(args, speaker)
 		SINFOGUI.playerid.Text = "Player ID: " ..speaker.UserId
 		SINFOGUI.maxplayers.Text = Players.MaxPlayers.. " Players Max"
 		SINFOGUI.placeid.Text = "Place ID: " ..PlaceId
+		SINFOGUI.jobid.Text = "Job ID: " .. (JobId ~= "" and JobId or "N/A")
 
 		CopyApp.MouseButton1Click:Connect(function()
 			toClipboard(speaker.CharacterAppearanceId)
@@ -9886,6 +9920,9 @@ addcmd('serverinfo',{'info','sinfo'},function(args, speaker)
 		end)
 		CopyPlcName.MouseButton1Click:Connect(function()
 			toClipboard(Asset.Name)
+		end)
+		CopyJobID.MouseButton1Click:Connect(function()
+			toClipboard(JobId)
 		end)
 
 		repeat
@@ -15882,6 +15919,276 @@ end)
 
 addcmd('mousesensitivity',{'ms'},function(args, speaker)
 	UserInputService.MouseDeltaSensitivity = args[1]
+end)
+
+-- // incognito (fake name / guest mode)
+incog = {
+	active = false,
+	name = "Guest",
+	badge = false,
+	realName = "",
+	realDisplay = "",
+	conns = {},
+	seen = {},
+	texts = {},
+	billboards = {}
+}
+incog.badgeGlyph = utf8.char(0xE000)
+
+function incogAdd(c)
+	if c then incog.conns[#incog.conns + 1] = c end
+	return c
+end
+
+function incogDrop()
+	for _, c in ipairs(incog.conns) do
+		pcall(function() c:Disconnect() end)
+	end
+	incog.conns = {}
+end
+
+function incogEsc(s)
+	return (tostring(s):gsub("%W", "%%%0"))
+end
+
+function incogLabel()
+	if incog.badge then
+		return incog.name .. " " .. incog.badgeGlyph
+	end
+	return incog.name
+end
+
+function incogHasReal(t)
+	if type(t) ~= "string" or t == "" then return false end
+	if incog.realDisplay ~= "" and t:find(incog.realDisplay, 1, true) then return true end
+	if incog.realName ~= "" and t:find(incog.realName, 1, true) then return true end
+	return false
+end
+
+function incogHasFake(t)
+	if type(t) ~= "string" or t == "" or incog.name == "" then return false end
+	return t:find(incog.name, 1, true) ~= nil
+end
+
+function incogToken(t, tok)
+	if tok == "" then return false end
+	return t:find("%f[%w_]" .. incogEsc(tok) .. "%f[^%w_]") ~= nil
+end
+
+function incogRewrite(t)
+	if type(t) ~= "string" or t == "" or not incog.active then return t end
+	if incog.realDisplay ~= "" and t:find(incog.realDisplay, 1, true) then
+		t = t:gsub(incogEsc(incog.realDisplay), function() return incog.name end)
+	end
+	if incog.realName ~= "" and t:find(incog.realName, 1, true) and incogToken(t, incog.realName) then
+		t = t:gsub(incogEsc(incog.realName), function() return incog.name end)
+	end
+	return t
+end
+
+function incogIsText(o)
+	return o:IsA("TextLabel") or o:IsA("TextButton") or o:IsA("TextBox")
+end
+
+function incogApplyText(o)
+	if not incog.active then return end
+	local ok, txt = pcall(function() return o.Text end)
+	if not ok or type(txt) ~= "string" or txt == "" then return end
+	local new = incogRewrite(txt)
+	if new ~= txt then
+		pcall(function() o.Text = new end)
+	end
+end
+
+function incogWatchText(o)
+	if incog.seen[o] then return end
+	incog.seen[o] = true
+	incog.texts[#incog.texts + 1] = o
+	incogApplyText(o)
+	incogAdd(o:GetPropertyChangedSignal("Text"):Connect(function()
+		incogApplyText(o)
+	end))
+end
+
+function incogHookGui(gui)
+	if incog.seen[gui] then return end
+	local hit = false
+	for _, o in ipairs(gui:GetDescendants()) do
+		if incogIsText(o) then
+			local ok, txt = pcall(function() return o.Text end)
+			if ok and (incogHasReal(txt) or incogHasFake(txt)) then
+				hit = true
+				break
+			end
+		end
+	end
+	if not hit then return end
+	incog.seen[gui] = true
+	incog.billboards[#incog.billboards + 1] = gui
+	for _, o in ipairs(gui:GetDescendants()) do
+		if incogIsText(o) then incogWatchText(o) end
+	end
+	incogAdd(gui.DescendantAdded:Connect(function(o)
+		if incogIsText(o) then
+			incogWatchText(o)
+			task.delay(0.25, function()
+				if incog.active then incogApplyText(o) end
+			end)
+		end
+	end))
+end
+
+function incogScanGui(root)
+	if not root then return end
+	for _, o in ipairs(root:GetDescendants()) do
+		if incogIsText(o) then
+			incogWatchText(o)
+		elseif o:IsA("BillboardGui") or o:IsA("SurfaceGui") then
+			incogHookGui(o)
+		elseif o:IsA("ScreenGui") or o:IsA("Folder") or o:IsA("Frame") then
+			-- nothing, descendants already covered
+		end
+	end
+	incogAdd(root.DescendantAdded:Connect(function(o)
+		if incogIsText(o) then
+			incogWatchText(o)
+		elseif o:IsA("BillboardGui") or o:IsA("SurfaceGui") then
+			task.delay(0.5, function()
+				if incog.active then incogHookGui(o) end
+			end)
+		end
+	end))
+end
+
+function incogScanWorkspace()
+	for _, o in ipairs(workspace:GetDescendants()) do
+		if o:IsA("BillboardGui") or o:IsA("SurfaceGui") then
+			incogHookGui(o)
+		end
+	end
+end
+
+function incogAttachCharacter()
+	local plr = Players.LocalPlayer
+	local char = plr and plr.Character
+	if not char then return end
+	pcall(function()
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.DisplayName = incogLabel()
+			incogAdd(hum:GetPropertyChangedSignal("DisplayName"):Connect(function()
+				if incog.active and hum.Parent then
+					hum.DisplayName = incogLabel()
+				end
+			end))
+		end
+	end)
+	for _, o in ipairs(char:GetDescendants()) do
+		if o:IsA("BillboardGui") or o:IsA("SurfaceGui") then
+			incogHookGui(o)
+		end
+	end
+	incogAdd(char.DescendantAdded:Connect(function(o)
+		if o:IsA("BillboardGui") or o:IsA("SurfaceGui") then
+			task.delay(0.5, function()
+				if incog.active then incogHookGui(o) end
+			end)
+		end
+	end))
+end
+
+function incognitoEnable(name, silent)
+	local plr = Players.LocalPlayer
+	if not plr then return end
+	if incog.active then incognitoDisable(true) end
+	incog.realName = plr.Name
+	incog.realDisplay = plr.DisplayName
+	if type(name) == "string" then
+		name = name:gsub("^%s+", ""):gsub("%s+$", "")
+	else
+		name = ""
+	end
+	if #name == 0 then
+		incog.name = "Guest " .. tostring(math.random(1, 9999))
+	else
+		if #name > 40 then name = string.sub(name, 1, 40) end
+		incog.name = name
+	end
+	incog.active = true
+	incog.conns = {}
+	incog.seen = {}
+	incog.texts = {}
+	incog.billboards = {}
+	incogAttachCharacter()
+	incogAdd(plr.CharacterAdded:Connect(function()
+		task.wait(0.5)
+		if incog.active then incogAttachCharacter() end
+	end))
+	local pg = plr:FindFirstChildOfClass("PlayerGui") or PlayerGui
+	if pg then incogScanGui(pg) end
+	pcall(function()
+		local cg = Services.CoreGui
+		if cg then incogScanGui(cg) end
+	end)
+	incogScanWorkspace()
+	incogAdd(workspace.DescendantAdded:Connect(function(o)
+		if o:IsA("BillboardGui") or o:IsA("SurfaceGui") then
+			task.delay(0.5, function()
+				if incog.active then incogHookGui(o) end
+			end)
+		end
+	end))
+	if not silent then
+		notify('Incognito', 'You now appear as "' .. incog.name .. '"', 5)
+	end
+end
+
+function incognitoDisable(silent)
+	if not incog.active then return end
+	incog.active = false
+	incogDrop()
+	local plr = Players.LocalPlayer
+	local char = plr and plr.Character
+	if char and plr then
+		pcall(function()
+			local hum = char:FindFirstChildOfClass("Humanoid")
+			if hum then hum.DisplayName = plr.DisplayName end
+		end)
+	end
+	for _, o in ipairs(incog.texts) do
+		pcall(function()
+			if o and o.Parent and incog.name ~= "" then
+				local t = o.Text
+				if type(t) == "string" and t:find(incog.name, 1, true) then
+					o.Text = t:gsub(incogEsc(incog.name), function() return incog.realDisplay end)
+				end
+			end
+		end)
+	end
+	incog.texts = {}
+	incog.billboards = {}
+	incog.seen = {}
+	if not silent then
+		notify('Incognito', 'Real name restored', 5)
+	end
+end
+
+addcmd('incognito',{'incog','guestmode','hidename'},function(args, speaker)
+	local a = args[1]
+	if a == "nonotify" then
+		table.remove(args, 1)
+		a = args[1]
+	end
+	local nm = table.concat(args, " ")
+	if nm == "" or nm:lower() == "random" then
+		incognitoEnable(nil, a == "silent")
+	else
+		incognitoEnable(nm, false)
+	end
+end)
+
+addcmd('unincognito',{'unincog','realname','showname','revertname'},function(args, speaker)
+	incognitoDisable(false)
 end)
 
 -- // mouse cursor tools
