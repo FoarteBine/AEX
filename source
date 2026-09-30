@@ -154,7 +154,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "0.1.6.9"
+currentVersion = "0.1.7.0"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -5992,6 +5992,7 @@ CMDs[#CMDs + 1] = {NAME = 'god', DESC = 'Makes your character difficult to kill 
 CMDs[#CMDs + 1] = {NAME = 'invisible / invis', DESC = 'Makes you invisible to other players'}
 CMDs[#CMDs + 1] = {NAME = 'brickgod / bgod', DESC = 'Disables killbricks around you (CanTouch off)'}
 CMDs[#CMDs + 1] = {NAME = 'unbrickgod / unbgod', DESC = 'Re-enables killbricks around you (CanTouch on)'}
+CMDs[#CMDs + 1] = {NAME = 'antistream / antistreaming', DESC = 'Disables streaming (all models persistent, min radius raised)'}
 CMDs[#CMDs + 1] = {NAME = 'visible / vis', DESC = 'Makes you visible to other players'}
 CMDs[#CMDs + 1] = {NAME = 'toolinvisible / toolinvis / tinvis', DESC = 'Makes you invisible to other players and able to use tools'}
 CMDs[#CMDs + 1] = {NAME = 'speed / ws / walkspeed [num]', DESC = 'Change your walkspeed (default is 16)'}
@@ -12691,10 +12692,8 @@ addcmd("goto", {"to"}, function(args, speaker)
 	for _, name in getPlayer(args[1], speaker) do
 		local targetCharacter = Players[name].Character
 		if targetCharacter ~= nil then
-			local targetRoot = targetCharacter:FindFirstChild("HumanoidRootPart")
 			local targetPivot = targetCharacter:GetPivot()
-			-- prefer HRP position; fall back to the character model's WorldPivot when no root part found
-			local targetPosition = targetRoot and targetRoot.Position or targetPivot.Position
+			local targetPosition = targetPivot.Position
 
 			if waitForStream and workspace.StreamingEnabled then
 				task.spawn(speaker.RequestStreamAroundAsync, speaker, targetPosition, 5)
@@ -13356,6 +13355,50 @@ addcmd('unbrickgod',{'unbgod','brickgodoff'},function(args, speaker)
 		end
 	end
 	notify('BrickGod','Killbricks restored (CanTouch on)')
+end)
+
+-- Disable streaming: huge min radius + mark all models Persistent (anti-streaming)
+antistreamRunning = false
+local antistreamConn
+
+addcmd('antistream',{'antistreaming','nostream'},function(args, speaker)
+	if antistreamRunning then return end
+	antistreamRunning = true
+	local function makePersistent()
+		for i, descendant in ipairs(workspace:GetDescendants()) do
+			if descendant:IsA("Model") then
+				pcall(function()
+					descendant.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+				end)
+			end
+		end
+	end
+	if sethiddenproperty then
+		pcall(function()
+			sethiddenproperty(workspace, "StreamingMinRadius", 2090000)
+		end)
+	end
+	makePersistent()
+	antistreamConn = workspace.DescendantAdded:Connect(function(descendant)
+		if descendant:IsA("Model") then
+			pcall(function()
+				descendant.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+			end)
+		end
+	end)
+	notify('AntiStream','Streaming effectively disabled (min radius raised, models persistent)')
+end)
+
+addcmd('unantistream',{},function(args, speaker)
+	if not antistreamRunning then return end
+	antistreamRunning = false
+	if antistreamConn then antistreamConn:Disconnect() antistreamConn = nil end
+	if sethiddenproperty then
+		pcall(function()
+			sethiddenproperty(workspace, "StreamingMinRadius", 200)
+		end)
+	end
+	notify('AntiStream','Disabled')
 end)
 
 addcmd('toolinvisible',{'toolinvis','tinvis'},function(args, speaker)
