@@ -13228,122 +13228,82 @@ addcmd("god", {}, function(args, speaker)
 end)
 
 invisRunning = false
+-- Seat/Weld invisibility (adapted from reference implementation)
+-- Character stays in workspace (StreamingEnabled-safe): no clone/Lighting tricks.
+local invisTransBackup = {}   -- part -> original Transparency
+local invisDiedConn
+
+local function invisSetTransparency(t)
+	local ch = Players.LocalPlayer.Character
+	if not ch then return end
+	for _, d in ipairs(ch:GetDescendants()) do
+		if d:IsA('BasePart') or d:IsA('Decal') then
+			d.Transparency = t
+		end
+	end
+end
+
+function TurnVisible()
+	if not invisRunning then return end
+	invisRunning = false
+	if invisDiedConn then invisDiedConn:Disconnect() invisDiedConn = nil end
+	local chair = workspace:FindFirstChild('invischair')
+	if chair then chair:Destroy() end
+	local ch = Players.LocalPlayer.Character
+	if ch then
+		for part, t in pairs(invisTransBackup) do
+			pcall(function() part.Transparency = t end)
+		end
+		local hum = ch:FindFirstChildOfClass('Humanoid')
+		if hum then
+			hum.PlatformStand = false
+			hum.AutoRotate = true
+		end
+	end
+	invisTransBackup = {}
+	notify('Visible','You are now visible')
+end
+
 addcmd('invisible',{'invis'},function(args, speaker)
 	if invisRunning then return end
 	invisRunning = true
-	-- Seat/Weld invisibility adapted from reference implementation
 	local Player = speaker
 	repeat wait(.1) until Player.Character
 	local Character = Player.Character
-	Character.Archivable = true
-	local IsInvis = false
-	local InvisibleCharacter = Character:Clone()
-	InvisibleCharacter.Parent = workspace
-	InvisibleCharacter.Name = ""
-	local Void = workspace.FallenPartsDestroyHeight
-	local invisFix, invisDied
-
-	local function setCloneTransparency()
-		for i,v in pairs(InvisibleCharacter:GetDescendants())do
-			if v:IsA("BasePart") then
-				v.Transparency = v.Name == "HumanoidRootPart" and 1 or 0.5
-			end
-		end
-	end
-
-	function Respawn()
-		if IsInvis == true then
-			pcall(function()
-				Player.Character = Character
-				wait()
-				Character.Parent = workspace
-				local hrp0 = Character:FindFirstChild("HumanoidRootPart")
-				if hrp0 then hrp0.Anchored = false end
-				Character.Humanoid.PlatformStand = false
-				Character:FindFirstChildWhichIsA'Humanoid':Destroy()
-				IsInvis = false
-				InvisibleCharacter:Destroy()
-				if invisFix then invisFix:Disconnect() end
-				if invisDied then invisDied:Disconnect() end
-				invisRunning = false
-			end)
-		elseif IsInvis == false then
-			pcall(function()
-				Player.Character = Character
-				wait()
-				Character.Parent = workspace
-				local hrp0 = Character:FindFirstChild("HumanoidRootPart")
-				if hrp0 then hrp0.Anchored = false end
-				Character.Humanoid.PlatformStand = false
-				Character:FindFirstChildWhichIsA'Humanoid':Destroy()
-				TurnVisible()
-			end)
-		end
-	end
-
-	invisFix = RunService.Stepped:Connect(function()
-		pcall(function()
-			local IsInteger = tostring(Void):find'-' and true or false
-			local Y = Player.Character.Humanoid.RootPart.Position.Y
-			if (IsInteger and Y <= Void) or (not IsInteger and Y >= Void) then
-				Respawn()
-			end
-		end)
-	end)
-
-	setCloneTransparency()
-
-	invisDied = InvisibleCharacter:FindFirstChildOfClass'Humanoid'.Died:Connect(function()
-		Respawn()
-		invisDied:Disconnect()
-	end)
-
-	if IsInvis == true then return end
-	IsInvis = true
-	local CF = workspace.CurrentCamera.CFrame
-	local CF_1 = Player.Character.Humanoid.RootPart.CFrame
-	-- Keep original in Lighting to avoid StreamingEnabled issues
-	Character:MoveTo(Vector3.new(0,math.pi*1000000,0))
-	wait()
-	Character.Parent = Lighting
-	InvisibleCharacter.HumanoidRootPart.CFrame = CF_1
-	Player.Character = InvisibleCharacter
-	execCmd('fixcam')
-	Player.Character.Animate.Disabled = true
-	Player.Character.Animate.Disabled = false
-
-	function TurnVisible()
-		if IsInvis == false then return end
-		if invisFix then invisFix:Disconnect() end
-		if invisDied then invisDied:Disconnect() end
-		local cam = workspace.CurrentCamera
-		local cloneHRP = InvisibleCharacter and InvisibleCharacter:FindFirstChild("HumanoidRootPart")
-		local CF_1 = cloneHRP and cloneHRP.CFrame or CFrame.new()
-		Player.Character = Character
-		wait()
-		Character.Parent = workspace
-		local hrp0 = Character:FindFirstChild("HumanoidRootPart")
-		if hrp0 then
-			hrp0.Anchored = false
-			hrp0.CFrame = CF_1
-		end
-		Character.Humanoid.PlatformStand = false
-		Character.Humanoid.AutoRotate = true
-		InvisibleCharacter:Destroy()
-		IsInvis = false
-		if cam then
-			cam.CameraSubject = Character:FindFirstChildOfClass("Humanoid")
-			cam.CameraType = Enum.CameraType.Custom
-		end
-		Player.Character.Animate.Disabled = true
-		Player.Character.Animate.Disabled = false
-		invisDied = Character:FindFirstChildOfClass'Humanoid'.Died:Connect(function()
-			Respawn()
-			invisDied:Disconnect()
-		end)
+	local humanoid = Character:FindFirstChildOfClass('Humanoid')
+	local hrp = Character:FindFirstChild('HumanoidRootPart')
+	if not humanoid or not hrp then
 		invisRunning = false
+		notify('Invisible','No Humanoid/HumanoidRootPart')
+		return
 	end
-
+	local savedPosition = hrp.CFrame
+	for _, d in ipairs(Character:GetDescendants()) do
+		if d:IsA('BasePart') or d:IsA('Decal') then
+			invisTransBackup[d] = d.Transparency
+		end
+	end
+	-- move out of world to a safe staging spot, then seat + weld back to saved pos
+	local staging = Vector3.new(0, 10000, 0)
+	Character:MoveTo(staging)
+	task.wait(0.15)
+	local seat = Instance.new('Seat')
+	seat.Name = 'invischair'
+	seat.Anchored = false
+	seat.CanCollide = false
+	seat.Transparency = 1
+	seat.Position = staging
+	seat.Parent = workspace
+	local weld = Instance.new('Weld')
+	weld.Part0 = seat
+	weld.Part1 = Character:FindFirstChild('Torso') or Character:FindFirstChild('UpperTorso')
+	weld.Parent = seat
+	task.wait()
+	seat.CFrame = savedPosition
+	invisSetTransparency(0.5)
+	invisDiedConn = humanoid.Died:Connect(function()
+		TurnVisible()
+	end)
 	notify('Invisible','You now appear invisible to other players')
 end)
 
