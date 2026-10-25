@@ -12235,9 +12235,34 @@ end)
 
 addcmd("showownership", {"netown", "shownetworkownership"}, function(args, speaker)
 	local ok, err = pcall(function()
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/FoarteBine/MoldovanAdmin/refs/heads/main/scripts/show-ownership.lua"))()
+		local a = true
+		local b = false
+		local c = false
+		local d = false
+		local settingsService = settings():GetService("PhysicsSettings")
+		settingsService.AreAwakePartsHighlighted = a
+		settingsService.AreNonAnchorsShown = b
+		settingsService.AreOwnersShown = c
+		settingsService.AreRegionsShown = d
+		notify("Network Ownership view enabled", "AEX")
 	end)
 	if not ok then notify("ShowOwnership", "Failed to load NetworkOwnership view: " .. tostring(err)) end
+end)
+
+addcmd("unshownetworkownership", {"unnonownership", "unshownetown", "unshowownership", "netownoff", "unnetownership", "unnetown"}, function(args, speaker)
+	local ok, err = pcall(function()
+		local a = false
+		local b = false
+		local c = false
+		local d = false
+		local settingsService = settings():GetService("PhysicsSettings")
+		settingsService.AreAwakePartsHighlighted = a
+		settingsService.AreNonAnchorsShown = b
+		settingsService.AreOwnersShown = c
+		settingsService.AreRegionsShown = d
+		notify("Network Ownership view disabled", "AEX")
+	end)
+	if not ok then notify("UnshowNetworkOwnership", "Failed to disable NetworkOwnership view: " .. tostring(err)) end
 end)
 
 addcmd("servers", {"serverbrowser", "serverbrowse", "sbrowser"}, function(args, speaker)
