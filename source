@@ -8722,6 +8722,7 @@ local hubFont = (function()
 end)()
 
 local hubGui, hubWin, hubList, hubListLayout, hubChipRow, hubSearch, hubStatusLbl
+local hubDetailGui, hubDetailWin, hubDetailName, hubDetailMeta, hubDetailVer, hubDetailDesc, hubDetailCmds, hubDetailBtn, hubDetailRem, hubDetailLetter, hubDetailImg, hubDetailEntry
 local hubAll = {}
 local hubCat = "All"
 local hubQuery = ""
@@ -8911,31 +8912,34 @@ function hubSetIcon(e, img)
 end
 
 function hubMakeCard(e, order)
-	local card = Instance.new("Frame")
+	local card = Instance.new("TextButton")
 	card.Name = "HUBCARD_" .. e.id
 	card.Parent = hubList
-	card.Size = UDim2.new(1, 0, 0, 74)
+	card.Size = UDim2.new(1, 0, 0, 60)
 	card.BackgroundColor3 = HUB_CARD
 	card.BorderSizePixel = 0
 	card.LayoutOrder = order
 	card.ZIndex = 11
+	card.AutoButtonColor = false
+	card.Text = ""
 	pcall(aexRound, card, 9)
+	aexHover(card)
 
 	local tile = Instance.new("Frame")
 	tile.Parent = card
-	tile.Position = UDim2.new(0, 10, 0, 12)
-	tile.Size = UDim2.new(0, 50, 0, 50)
+	tile.Position = UDim2.new(0, 10, 0, 10)
+	tile.Size = UDim2.new(0, 40, 0, 40)
 	tile.BackgroundColor3 = hubTileColor(e.id)
 	tile.BorderSizePixel = 0
 	tile.ZIndex = 12
-	pcall(aexRound, tile, 9)
+	pcall(aexRound, tile, 8)
 
 	local letter = Instance.new("TextLabel")
 	letter.Parent = tile
 	letter.BackgroundTransparency = 1
 	letter.Size = UDim2.new(1, 0, 1, 0)
 	letter.Font = Enum.Font.GothamBold
-	letter.TextSize = 22
+	letter.TextSize = 19
 	letter.TextColor3 = Color3.new(1, 1, 1)
 	letter.Text = string.upper(string.sub(e.name, 1, 1))
 	letter.ZIndex = 13
@@ -8948,16 +8952,16 @@ function hubMakeCard(e, order)
 	img.Visible = false
 	img.ScaleType = Enum.ScaleType.Fit
 	img.ZIndex = 14
-	pcall(aexRound, img, 9)
+	pcall(aexRound, img, 8)
 	hubSetIcon(e, img)
 
 	local nm = Instance.new("TextLabel")
 	nm.Parent = card
 	nm.BackgroundTransparency = 1
-	nm.Position = UDim2.new(0, 70, 0, 9)
-	nm.Size = UDim2.new(1, -116, 0, 18)
+	nm.Position = UDim2.new(0, 60, 0, 7)
+	nm.Size = UDim2.new(1, -144, 0, 16)
 	nm.Font = Enum.Font.GothamBold
-	nm.TextSize = 15
+	nm.TextSize = 14
 	nm.TextXAlignment = Enum.TextXAlignment.Left
 	nm.TextTruncate = Enum.TextTruncate.AtEnd
 	nm.TextColor3 = Color3.new(1, 1, 1)
@@ -8967,46 +8971,24 @@ function hubMakeCard(e, order)
 	local meta = Instance.new("TextLabel")
 	meta.Parent = card
 	meta.BackgroundTransparency = 1
-	meta.Position = UDim2.new(0, 70, 0, 27)
-	meta.Size = UDim2.new(1, -116, 0, 13)
+	meta.Position = UDim2.new(0, 60, 0, 25)
+	meta.Size = UDim2.new(1, -144, 0, 12)
 	meta.Font = hubFont
 	meta.TextSize = 11
 	meta.TextXAlignment = Enum.TextXAlignment.Left
 	meta.TextTruncate = Enum.TextTruncate.AtEnd
 	meta.TextColor3 = HUB_MUTED
-	local extra = ""
-	if type(e.cmds) == "string" and e.cmds ~= "" then
-		local words = {}
-		for word in e.cmds:gmatch("%S+") do table.insert(words, word) end
-		local shownCmds = {}
-		for i = 1, math.min(3, #words) do table.insert(shownCmds, words[i]) end
-		extra = "   ·   " .. table.concat(shownCmds, ", ")
-		if #words > 3 then extra = extra .. " +" .. (#words - 3) end
-	end
-	meta.Text = "by " .. e.author .. "   ·   " .. e.cat .. extra
+	meta.Text = "by " .. e.author .. "   ·   " .. e.cat
 	meta.ZIndex = 12
-
-	local ds = Instance.new("TextLabel")
-	ds.Parent = card
-	ds.BackgroundTransparency = 1
-	ds.Position = UDim2.new(0, 70, 0, 41)
-	ds.Size = UDim2.new(1, -116, 0, 28)
-	ds.Font = hubFont
-	ds.TextSize = 12
-	ds.TextXAlignment = Enum.TextXAlignment.Left
-	ds.TextYAlignment = Enum.TextYAlignment.Top
-	ds.TextWrapped = true
-	ds.TextColor3 = Color3.fromRGB(200, 200, 205)
-	ds.Text = e.desc
-	ds.ZIndex = 12
 
 	local ver = Instance.new("TextLabel")
 	ver.Parent = card
 	ver.BackgroundTransparency = 1
-	ver.Position = UDim2.new(1, -96, 0, 8)
-	ver.Size = UDim2.new(0, 86, 0, 12)
+	ver.Position = UDim2.new(1, -94, 0, 7)
+	ver.Size = UDim2.new(0, 84, 0, 11)
 	ver.Font = hubFont
 	ver.TextSize = 10
+	ver.TextXAlignment = Enum.TextXAlignment.Right
 	ver.TextColor3 = HUB_MUTED
 	ver.Text = "v" .. e.version
 	ver.ZIndex = 12
@@ -9014,12 +8996,12 @@ function hubMakeCard(e, order)
 	local btn = Instance.new("TextButton")
 	btn.Parent = card
 	btn.Name = "HubAction"
-	btn.Position = UDim2.new(1, -96, 0, 23)
-	btn.Size = UDim2.new(0, 86, 0, 28)
+	btn.Position = UDim2.new(1, -94, 0, 21)
+	btn.Size = UDim2.new(0, 84, 0, 24)
 	btn.BackgroundColor3 = AEX_ACCENT
 	btn.BorderSizePixel = 0
 	btn.Font = Enum.Font.GothamBold
-	btn.TextSize = 13
+	btn.TextSize = 12
 	btn.TextColor3 = Color3.new(1, 1, 1)
 	btn.AutoButtonColor = false
 	btn.Text = "Install"
@@ -9031,8 +9013,8 @@ function hubMakeCard(e, order)
 	rem.Parent = card
 	rem.Name = "HubRemove"
 	rem.BackgroundTransparency = 1
-	rem.Position = UDim2.new(1, -96, 0, 54)
-	rem.Size = UDim2.new(0, 86, 0, 14)
+	rem.Position = UDim2.new(1, -94, 0, 45)
+	rem.Size = UDim2.new(0, 84, 0, 12)
 	rem.Font = hubFont
 	rem.TextSize = 10
 	rem.TextColor3 = HUB_MUTED
@@ -9047,7 +9029,7 @@ function hubMakeCard(e, order)
 	btn.BackgroundColor3 = col
 	rem.Visible = (st == "installed" or st == "downloaded" or st == "update")
 
-	btn.MouseButton1Click:Connect(function()
+	local function hubCardAct()
 		local cur = hubEntryState(e)
 		if cur == "busy" then return end
 		if cur == "available" or cur == "update" or cur == "installed" then
@@ -9055,11 +9037,282 @@ function hubMakeCard(e, order)
 		elseif cur == "downloaded" then
 			hubActivate(e)
 		end
-	end)
+	end
+	btn.MouseButton1Click:Connect(hubCardAct)
 	rem.MouseButton1Click:Connect(function()
 		hubRemove(e)
 	end)
+	card.MouseButton1Click:Connect(function()
+		hubDetailOpen(e)
+	end)
 	return card
+end
+
+function hubDetailBuild()
+	local vp = workspace.CurrentCamera.ViewportSize
+	local wW = math.max(360, math.min(vp.X - 32, 560))
+	local wH = math.max(320, math.min(vp.Y - 32, 480))
+
+	hubDetailGui = Instance.new("Frame")
+	hubDetailGui.Name = "HubDetail"
+	hubDetailGui.Parent = hubGui
+	hubDetailGui.BackgroundColor3 = Color3.new(0, 0, 0)
+	hubDetailGui.BackgroundTransparency = 0.45
+	hubDetailGui.Size = UDim2.new(1, 0, 1, 0)
+	hubDetailGui.BorderSizePixel = 0
+	hubDetailGui.ZIndex = 20
+
+	local backdrop = Instance.new("TextButton")
+	backdrop.Parent = hubDetailGui
+	backdrop.BackgroundTransparency = 1
+	backdrop.Size = UDim2.new(1, 0, 1, 0)
+	backdrop.BorderSizePixel = 0
+	backdrop.Text = ""
+	backdrop.AutoButtonColor = false
+	backdrop.ZIndex = 20
+	backdrop.MouseButton1Click:Connect(function() hubDetailClose() end)
+
+	hubDetailWin = Instance.new("Frame")
+	hubDetailWin.Name = "HubDetailWin"
+	hubDetailWin.Parent = hubDetailGui
+	hubDetailWin.AnchorPoint = Vector2.new(0.5, 0.5)
+	hubDetailWin.Position = UDim2.new(0.5, 0, 0.5, 0)
+	hubDetailWin.Size = UDim2.new(0, wW, 0, wH)
+	hubDetailWin.BackgroundColor3 = Color3.fromRGB(37, 37, 39)
+	hubDetailWin.BorderSizePixel = 0
+	hubDetailWin.Active = true
+	hubDetailWin.ZIndex = 21
+	pcall(aexRound, hubDetailWin, 12)
+	aexStroke(hubDetailWin, 0.4)
+
+	local head = Instance.new("Frame")
+	head.Parent = hubDetailWin
+	head.Size = UDim2.new(1, 0, 0, 44)
+	head.BackgroundColor3 = Color3.fromRGB(44, 44, 47)
+	head.BorderSizePixel = 0
+	head.ZIndex = 22
+	pcall(aexRound, head, 12, "top")
+
+	local accent = Instance.new("Frame")
+	accent.Parent = head
+	accent.Position = UDim2.new(0, 0, 1, -2)
+	accent.Size = UDim2.new(1, 0, 0, 2)
+	accent.BackgroundColor3 = AEX_ACCENT
+	accent.BorderSizePixel = 0
+	accent.ZIndex = 23
+
+	hubDetailName = Instance.new("TextLabel")
+	hubDetailName.Parent = head
+	hubDetailName.BackgroundTransparency = 1
+	hubDetailName.Position = UDim2.new(0, 12, 0, 12)
+	hubDetailName.Size = UDim2.new(1, -54, 0, 20)
+	hubDetailName.Font = Enum.Font.GothamBold
+	hubDetailName.TextSize = 15
+	hubDetailName.TextXAlignment = Enum.TextXAlignment.Left
+	hubDetailName.TextTruncate = Enum.TextTruncate.AtEnd
+	hubDetailName.TextColor3 = Color3.new(1, 1, 1)
+	hubDetailName.ZIndex = 23
+
+	local xBtn = Instance.new("TextButton")
+	xBtn.Parent = head
+	xBtn.Position = UDim2.new(1, -34, 0, 11)
+	xBtn.Size = UDim2.new(0, 22, 0, 22)
+	xBtn.BackgroundTransparency = 1
+	xBtn.Font = Enum.Font.GothamBold
+	xBtn.TextSize = 14
+	xBtn.TextColor3 = Color3.new(1, 1, 1)
+	xBtn.AutoButtonColor = false
+	xBtn.Text = "X"
+	xBtn.ZIndex = 23
+	aexHover(xBtn)
+	xBtn.MouseButton1Click:Connect(function() hubDetailClose() end)
+
+	local tile = Instance.new("Frame")
+	tile.Parent = hubDetailWin
+	tile.Position = UDim2.new(0, 14, 0, 56)
+	tile.Size = UDim2.new(0, 56, 0, 56)
+	tile.BackgroundColor3 = Color3.fromRGB(70, 70, 74)
+	tile.BorderSizePixel = 0
+	tile.ZIndex = 22
+	pcall(aexRound, tile, 10)
+
+	hubDetailLetter = Instance.new("TextLabel")
+	hubDetailLetter.Parent = tile
+	hubDetailLetter.BackgroundTransparency = 1
+	hubDetailLetter.Size = UDim2.new(1, 0, 1, 0)
+	hubDetailLetter.Font = Enum.Font.GothamBold
+	hubDetailLetter.TextSize = 26
+	hubDetailLetter.TextColor3 = Color3.new(1, 1, 1)
+	hubDetailLetter.Text = ""
+	hubDetailLetter.ZIndex = 23
+
+	hubDetailImg = Instance.new("ImageLabel")
+	hubDetailImg.Parent = tile
+	hubDetailImg.BackgroundTransparency = 1
+	hubDetailImg.Size = UDim2.new(1, 0, 1, 0)
+	hubDetailImg.Image = ""
+	hubDetailImg.Visible = false
+	hubDetailImg.ScaleType = Enum.ScaleType.Fit
+	hubDetailImg.ZIndex = 24
+	pcall(aexRound, hubDetailImg, 10)
+
+	hubDetailMeta = Instance.new("TextLabel")
+	hubDetailMeta.Parent = hubDetailWin
+	hubDetailMeta.BackgroundTransparency = 1
+	hubDetailMeta.Position = UDim2.new(0, 82, 0, 76)
+	hubDetailMeta.Size = UDim2.new(1, -182, 0, 16)
+	hubDetailMeta.Font = hubFont
+	hubDetailMeta.TextSize = 12
+	hubDetailMeta.TextXAlignment = Enum.TextXAlignment.Left
+	hubDetailMeta.TextTruncate = Enum.TextTruncate.AtEnd
+	hubDetailMeta.TextColor3 = HUB_MUTED
+	hubDetailMeta.ZIndex = 22
+
+	hubDetailVer = Instance.new("TextLabel")
+	hubDetailVer.Parent = hubDetailWin
+	hubDetailVer.BackgroundTransparency = 1
+	hubDetailVer.Position = UDim2.new(1, -98, 0, 76)
+	hubDetailVer.Size = UDim2.new(0, 84, 0, 16)
+	hubDetailVer.Font = hubFont
+	hubDetailVer.TextSize = 12
+	hubDetailVer.TextXAlignment = Enum.TextXAlignment.Right
+	hubDetailVer.TextColor3 = HUB_MUTED
+	hubDetailVer.ZIndex = 22
+
+	local div = Instance.new("Frame")
+	div.Parent = hubDetailWin
+	div.Position = UDim2.new(0, 14, 0, 124)
+	div.Size = UDim2.new(1, -28, 0, 1)
+	div.BackgroundColor3 = Color3.fromRGB(56, 56, 60)
+	div.BorderSizePixel = 0
+	div.ZIndex = 22
+-- ===== hub detail build2 =====
+
+	local scroller = Instance.new("ScrollingFrame")
+	scroller.Parent = hubDetailWin
+	scroller.Position = UDim2.new(0, 14, 0, 132)
+	scroller.Size = UDim2.new(1, -28, 1, -174)
+	scroller.BackgroundTransparency = 1
+	scroller.BorderSizePixel = 0
+	scroller.ScrollBarImageColor3 = Color3.fromRGB(78, 78, 79)
+	scroller.ScrollBarThickness = 5
+	scroller.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scroller.CanvasSize = UDim2.new(0, 0, 0, 0)
+	scroller.BottomImage = ""
+	scroller.MidImage = ""
+	scroller.TopImage = ""
+	scroller.ZIndex = 22
+	local sLayout = Instance.new("UIListLayout")
+	sLayout.Parent = scroller
+	sLayout.Padding = UDim.new(0, 10)
+	sLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	hubDetailDesc = Instance.new("TextLabel")
+	hubDetailDesc.Parent = scroller
+	hubDetailDesc.BackgroundTransparency = 1
+	hubDetailDesc.Size = UDim2.new(1, 0, 0, 0)
+	hubDetailDesc.AutomaticSize = Enum.AutomaticSize.Y
+	hubDetailDesc.Font = hubFont
+	hubDetailDesc.TextSize = 13
+	hubDetailDesc.TextXAlignment = Enum.TextXAlignment.Left
+	hubDetailDesc.TextYAlignment = Enum.TextYAlignment.Top
+	hubDetailDesc.TextWrapped = true
+	hubDetailDesc.TextColor3 = Color3.fromRGB(205, 205, 210)
+	hubDetailDesc.ZIndex = 22
+
+	hubDetailCmds = Instance.new("TextLabel")
+	hubDetailCmds.Parent = scroller
+	hubDetailCmds.BackgroundTransparency = 1
+	hubDetailCmds.Size = UDim2.new(1, 0, 0, 0)
+	hubDetailCmds.AutomaticSize = Enum.AutomaticSize.Y
+	hubDetailCmds.Font = hubFont
+	hubDetailCmds.TextSize = 12
+	hubDetailCmds.TextXAlignment = Enum.TextXAlignment.Left
+	hubDetailCmds.TextYAlignment = Enum.TextYAlignment.Top
+	hubDetailCmds.TextWrapped = true
+	hubDetailCmds.TextColor3 = HUB_MUTED
+	hubDetailCmds.ZIndex = 22
+
+	hubDetailBtn = Instance.new("TextButton")
+	hubDetailBtn.Parent = hubDetailWin
+	hubDetailBtn.Position = UDim2.new(0, 14, 1, -50)
+	hubDetailBtn.Size = UDim2.new(1, -28, 0, 34)
+	hubDetailBtn.BackgroundColor3 = AEX_ACCENT
+	hubDetailBtn.BorderSizePixel = 0
+	hubDetailBtn.Font = Enum.Font.GothamBold
+	hubDetailBtn.TextSize = 14
+	hubDetailBtn.TextColor3 = Color3.new(1, 1, 1)
+	hubDetailBtn.AutoButtonColor = false
+	hubDetailBtn.Text = "Install"
+	hubDetailBtn.ZIndex = 23
+	pcall(aexRound, hubDetailBtn, 8)
+	aexHover(hubDetailBtn)
+
+	hubDetailRem = Instance.new("TextButton")
+	hubDetailRem.Parent = hubDetailWin
+	hubDetailRem.BackgroundTransparency = 1
+	hubDetailRem.Position = UDim2.new(0, 14, 1, -14)
+	hubDetailRem.Size = UDim2.new(1, -28, 0, 12)
+	hubDetailRem.Font = hubFont
+	hubDetailRem.TextSize = 10
+	hubDetailRem.TextColor3 = HUB_MUTED
+	hubDetailRem.Text = "remove plugin"
+	hubDetailRem.AutoButtonColor = false
+	hubDetailRem.Visible = false
+	hubDetailRem.ZIndex = 23
+
+	hubDetailBtn.MouseButton1Click:Connect(function()
+		local cur = hubEntryState(hubDetailEntry)
+		if cur == "busy" then return end
+		if cur == "available" or cur == "update" or cur == "installed" then
+			hubInstall(hubDetailEntry)
+		elseif cur == "downloaded" then
+			hubActivate(hubDetailEntry)
+		end
+		hubDetailRefresh()
+	end)
+	hubDetailRem.MouseButton1Click:Connect(function()
+		hubRemove(hubDetailEntry)
+		hubDetailRefresh()
+	end)
+end
+-- ===== hub detail actions =====
+
+function hubDetailOpen(e)
+	if not hubGui then return end
+	hubDetailEntry = e
+	if not hubDetailGui or not hubDetailGui.Parent then hubDetailBuild() end
+	if not hubDetailGui then return end
+	hubDetailName.Text = e.name
+	hubDetailMeta.Text = "by " .. e.author .. "   ·   " .. e.cat
+	hubDetailVer.Text = "v" .. e.version
+	hubDetailDesc.Text = (type(e.desc) == "string" and e.desc ~= "") and e.desc or "No description provided."
+	hubDetailCmds.Text = (type(e.cmds) == "string" and e.cmds ~= "") and ("Commands: " .. e.cmds) or "No commands listed."
+	hubDetailLetter.Text = string.upper(string.sub(e.name, 1, 1))
+	hubDetailLetter.Visible = true
+	hubDetailImg.Visible = false
+	hubDetailImg.Image = ""
+	if e.iconAsset then
+		hubDetailImg.Image = e.iconAsset
+		hubDetailImg.Visible = true
+	else
+		hubSetIcon(e, hubDetailImg)
+	end
+	hubDetailGui.Visible = true
+	hubDetailRefresh()
+end
+
+function hubDetailClose()
+	if hubDetailGui then hubDetailGui.Visible = false end
+end
+
+function hubDetailRefresh()
+	if not hubDetailGui or not hubDetailGui.Visible or not hubDetailEntry then return end
+	local st = hubEntryState(hubDetailEntry)
+	local lbl, col = hubActionFor(st)
+	hubDetailBtn.Text = lbl
+	hubDetailBtn.BackgroundColor3 = col
+	hubDetailRem.Visible = (st == "installed" or st == "downloaded" or st == "update")
 end
 
 function hubMatches(e)
@@ -9178,6 +9431,7 @@ function hubInstall(e)
 		hubBusyId[e.id] = nil
 		hubSetStatus(e.name .. " v" .. e.version .. " installed")
 		hubBuildList()
+		hubDetailRefresh()
 	end)
 end
 
@@ -9190,6 +9444,7 @@ function hubActivate(e)
 		hubBusyId[e.id] = nil
 		hubSetStatus(e.name .. " loaded")
 		hubBuildList()
+		hubDetailRefresh()
 	end)
 end
 
@@ -9207,6 +9462,7 @@ function hubRemove(e)
 		hubBusyId[e.id] = nil
 		hubSetStatus(e.name .. " removed")
 		hubBuildList()
+		hubDetailRefresh()
 	end)
 end
 
@@ -9327,6 +9583,7 @@ function buildPluginsHub()
 	aexHover(closeBtn)
 	closeBtn.MouseButton1Click:Connect(function()
 		if hubGui then hubGui.Enabled = false end
+		hubDetailClose()
 	end)
 
 	local refreshBtn = Instance.new("TextButton")
@@ -9467,6 +9724,8 @@ function togglePluginsHub()
 		else
 			hubLoadIndex(false)
 		end
+	else
+		hubDetailClose()
 	end
 end
 
@@ -9477,7 +9736,11 @@ end)
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then return end
 	if hubGui and hubGui.Enabled and input.KeyCode == Enum.KeyCode.Escape then
-		hubGui.Enabled = false
+		if hubDetailGui and hubDetailGui.Visible then
+			hubDetailClose()
+		else
+			hubGui.Enabled = false
+		end
 	end
 end)
 
@@ -12234,7 +12497,7 @@ addcmd("emotebar", {}, function(args, speaker)
 	if not ok then notify("EmoteBar", "Failed to load EmoteBar: " .. tostring(err)) end
 end)
 
-addcmd("jetpack", {"jp", "flypack", "fp"}, function(args, speaker)
+addcmd("jetpack", {"flypack", "fp"}, function(args, speaker)
 	local ok, err = pcall(function()
 		local obj = game:GetObjects("rbxassetid://9969729848")[1]
 		if not obj then error("Jetpack object not found") end
