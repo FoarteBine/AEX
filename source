@@ -5799,6 +5799,8 @@ CMDs[#CMDs + 1] = {NAME = 'antigameplaypaused', DESC = 'Clears the annoying box 
 CMDs[#CMDs + 1] = {NAME = 'unantigameplaypaused', DESC = 'Disables antigameplaypaused'}
 CMDs[#CMDs + 1] = {NAME = 'clientantikick / antikick (CLIENT)', DESC = 'Prevents localscripts from kicking you'}
 CMDs[#CMDs + 1] = {NAME = 'clientantiteleport / antiteleport (CLIENT)', DESC = 'Prevents localscripts from teleporting you'}
+CMDs[#CMDs + 1] = {NAME = 'antitp / antiteleportback [buffer]', DESC = 'Blocks the game from teleporting/moving you (AEX teleports still work)'}
+CMDs[#CMDs + 1] = {NAME = 'antitpspeed / antitpbuffer [studs]', DESC = 'Sets the antitp per-frame movement buffer (default is 3)'}
 CMDs[#CMDs + 1] = {NAME = 'allowrejoin / allowrj (CLIENT)', DESC = 'Toggles if antiteleport allows you to rejoin or not'}
 CMDs[#CMDs + 1] = {NAME = 'cancelteleport / canceltp', DESC = 'Cancels teleports in progress'}
 CMDs[#CMDs + 1] = {NAME = 'volume / vol [0-10]', DESC = 'Adjusts your game volume on a scale of 0 to 10'}
@@ -6627,6 +6629,7 @@ local lastBreakTime = 0
 function execCmd(cmdStr,speaker,store)
 	cmdStr = cmdStr:gsub("%s+$","")
 	task.spawn(function()
+		if atp then atp.accept = true atp.acceptUntil = tick() + 0.3 end
 		local rawCmdStr = cmdStr
 		cmdStr = string.gsub(cmdStr,"\\\\","%%BackSlash%%")
 		local commandsToRun = splitString(cmdStr,"\\")
@@ -11859,6 +11862,99 @@ addcmd('clientantiteleport',{'antiteleport'},function(args, speaker)
 	end))
 
 	notify('Client AntiTP','Client anti teleport is now active (only effective on localscript teleport)')
+end)
+
+-- // antitp: blocks the game (server / localscripts) from teleporting or moving your
+-- character more than <buffer> studs in a single frame, and undoes such a move by
+-- snapping back to the last accepted position. AEX's own teleports keep working:
+-- every command that runs through execCmd marks "accept one jump" for a short window,
+-- so your teleport is taken as the new safe spot while any later server rollback
+-- (a second jump) is reverted right back to the teleported place.
+atp = {
+	on = false,
+	buffer = 3,
+	accept = false,
+	acceptUntil = 0,
+	last = nil,
+	conn = nil,
+	charConn = nil,
+}
+
+function atp.root()
+	local char = Players.LocalPlayer.Character
+	return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+function atp.reset()
+	atp.last = nil
+end
+
+function atp.step()
+	if not atp.on then return end
+	local root = atp.root()
+	if not root then
+		atp.last = nil
+		return
+	end
+	if not atp.last then
+		atp.last = root.CFrame
+		return
+	end
+	local moved = (root.Position - atp.last.Position).Magnitude
+	if atp.accept then
+		-- one big jump right after a command is our own teleport: accept it once
+		if moved > atp.buffer and tick() < atp.acceptUntil then
+			atp.accept = false
+			atp.last = root.CFrame
+			return
+		end
+		if tick() >= atp.acceptUntil then atp.accept = false end
+	end
+	if moved > atp.buffer then
+		root.CFrame = atp.last
+		pcall(function() root.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end)
+		pcall(function() root.AssemblyAngularVelocity = Vector3.new(0, 0, 0) end)
+		pcall(function() root.Velocity = Vector3.new(0, 0, 0) end)
+	else
+		atp.last = root.CFrame
+	end
+end
+
+function atp.disable()
+	atp.on = false
+	atp.last = nil
+	if atp.conn then atp.conn:Disconnect() atp.conn = nil end
+	if atp.charConn then atp.charConn:Disconnect() atp.charConn = nil end
+end
+
+function atp.enable()
+	atp.on = true
+	atp.last = nil
+	atp.accept = false
+	if atp.conn then atp.conn:Disconnect() end
+	atp.conn = RunService.Heartbeat:Connect(atp.step)
+	if atp.charConn then atp.charConn:Disconnect() end
+	atp.charConn = Players.LocalPlayer.CharacterAdded:Connect(atp.reset)
+end
+
+addcmd('antitp',{'antiteleportback','antitpback'},function(args, speaker)
+	local num = tonumber(args[1])
+	if num and num > 0 then atp.buffer = num end
+	if atp.on then
+		atp.disable()
+		notify('antiTP','Anti teleport-back is OFF')
+	else
+		atp.enable()
+		notify('antiTP','Game teleports/moves of over ' .. tostring(atp.buffer) .. ' studs/frame are now blocked (AEX teleports still work)')
+	end
+end)
+
+addcmd('antitpspeed',{'antitpbuffer','antitpstuds'},function(args, speaker)
+	local num = tonumber(args[1])
+	if num and num > 0 then
+		atp.buffer = num
+		notify('antiTP','Buffer set to ' .. tostring(num) .. ' studs/frame')
+	end
 end)
 
 addcmd('allowrejoin',{'allowrj'},function(args, speaker)
