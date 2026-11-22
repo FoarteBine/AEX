@@ -10882,6 +10882,7 @@ function startTweenFly(speed, speaker)
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	FLYING = false
 	pcall(NOFLY)
+	stopVehicleFly(true)
 	stopTweenFly()
 	pcall(function() unmobilefly(targ) end)
 	if flyKeyDown then
@@ -10918,7 +10919,184 @@ function startTweenFly(speed, speaker)
 	tfly.renderConn = RunService.RenderStepped:Connect(tfly.renderStep)
 end
 
+-- // vfly (vehiclefly): stable damped flight while sitting in a vehicle/seat
+-- The old vehicle mode just reused the character fly engine: it slammed a BodyGyro
+-- with P = 9e4 (30x the Roblox default) onto the welded character/vehicle assembly
+-- and forced CameraType.Track, so the whole car oscillated and the camera shook with
+-- it. This engine instead mounts the movers on the vehicle chassis, damps the gyro,
+-- smooths the velocity change (no 0/50 snapping), moves frame-rate independently and
+-- shuts itself down as soon as you leave the seat.
+-- State is kept in one GLOBAL table (like aexesp) so the main chunk does not
+-- consume another local slot - it is already close to the Luau 200 local limit.
+tveh = {
+	player = nil,
+	seat = nil,
+	root = nil,
+	force = nil,
+	gyro = nil,
+	vel = Vector3.new(),
+	on = false,
+	renderConn = nil,
+	baseSpeed = 50,
+	boost = 2,
+	accel = 10,
+	gyroP = 60000,
+	gyroD = 10000,
+}
+
+function tveh.isOn()
+	return tveh.force ~= nil and tveh.gyro ~= nil
+end
+
+function tveh.clearMovers()
+	if tveh.force then
+		pcall(function() tveh.force:Destroy() end)
+		tveh.force = nil
+	end
+	if tveh.gyro then
+		pcall(function() tveh.gyro:Destroy() end)
+		tveh.gyro = nil
+	end
+end
+
+function tveh.makeMovers(root)
+	tveh.clearMovers()
+	local bv = Instance.new("BodyVelocity")
+	bv.Name = "AEXVFly"
+	bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+	bv.Velocity = Vector3.new(0, 0, 0)
+	bv.Parent = root
+	local bg = Instance.new("BodyGyro")
+	bg.Name = "AEXVFlyGyro"
+	bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+	bg.P = tveh.gyroP
+	bg.D = tveh.gyroD
+	bg.CFrame = root.CFrame
+	bg.Parent = root
+	tveh.force = bv
+	tveh.gyro = bg
+end
+
+function tveh.mountOf(hum)
+	if not hum then return nil end
+	local seat = hum.SeatPart
+	if not seat or not seat:IsDescendantOf(workspace) then return nil end
+	local mount = seat
+	pcall(function()
+		if seat.AssemblyRootPart then mount = seat.AssemblyRootPart end
+	end)
+	return mount, seat
+end
+
+function tveh.targetVelocity()
+	local uis = UserInputService
+	local cam = workspace.CurrentCamera
+	local look = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
+	local right = cam and cam.CFrame.RightVector or Vector3.new(1, 0, 0)
+	local dir = Vector3.new()
+	if uis:IsKeyDown(Enum.KeyCode.W) then dir = dir + look end
+	if uis:IsKeyDown(Enum.KeyCode.S) then dir = dir - look end
+	if uis:IsKeyDown(Enum.KeyCode.D) then dir = dir + right end
+	if uis:IsKeyDown(Enum.KeyCode.A) then dir = dir - right end
+	if QEfly then
+		if uis:IsKeyDown(Enum.KeyCode.E) then dir = dir + Vector3.new(0, 1, 0) end
+		if uis:IsKeyDown(Enum.KeyCode.Q) then dir = dir - Vector3.new(0, 1, 0) end
+	end
+	if dir.Magnitude > 1 then dir = dir.Unit end
+	local speed = (tonumber(vehicleflyspeed) or 1) * tveh.baseSpeed
+	if uis:IsKeyDown(Enum.KeyCode.LeftShift) then speed = speed * tveh.boost end
+	return dir * speed
+end
+
+function tveh.step(delta)
+	if not tveh.on then return end
+	local plr = tveh.player or Players.LocalPlayer
+	local char = plr and plr.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local mount, seat = tveh.mountOf(hum)
+	if not mount or (tveh.seat and seat ~= tveh.seat) then
+		stopVehicleFly()
+		return
+	end
+	local force, gyro = tveh.force, tveh.gyro
+	if not force or not gyro or force.Parent ~= mount or gyro.Parent ~= mount then
+		-- the vehicle was rebuilt while we were flying
+		tveh.root = mount
+		if not pcall(tveh.makeMovers, mount) or not tveh.isOn() then
+			stopVehicleFly()
+			return
+		end
+		force, gyro = tveh.force, tveh.gyro
+	end
+	local target = tveh.targetVelocity()
+	local alpha = 1 - math.exp(-tveh.accel * delta)
+	tveh.vel = tveh.vel + (target - tveh.vel) * alpha
+	force.Velocity = tveh.vel
+	local cam = workspace.CurrentCamera
+	if cam then
+		gyro.CFrame = cam.CFrame
+	end
+end
+
+function stopVehicleFly(quiet)
+	local was = tveh.on
+	tveh.on = false
+	if was then FLYING = false end
+	if tveh.renderConn then
+		tveh.renderConn:Disconnect()
+		tveh.renderConn = nil
+	end
+	tveh.clearMovers()
+	tveh.vel = Vector3.new()
+	tveh.root = nil
+	tveh.seat = nil
+	tveh.player = nil
+	if was and not quiet then
+		notify("vfly", "Vehicle fly disabled")
+	end
+end
+
+function startVehicleFly(speed, speaker)
+	if speed ~= nil and isNumber(speed) then
+		vehicleflyspeed = tonumber(speed)
+	end
+	local targ = speaker or Players.LocalPlayer
+	local char = targ.Character or targ.CharacterAdded:Wait()
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local mount, seat = tveh.mountOf(hum)
+	if not mount then
+		notify("vfly", "Sit in a vehicle first")
+		return
+	end
+	stopTweenFly()
+	pcall(NOFLY)
+	pcall(function() unmobilefly(targ) end)
+	stopVehicleFly(true)
+	if flyKeyDown then
+		pcall(function() flyKeyDown:Disconnect() end)
+		flyKeyDown = nil
+	end
+	if flyKeyUp then
+		pcall(function() flyKeyUp:Disconnect() end)
+		flyKeyUp = nil
+	end
+	tveh.player = targ
+	tveh.seat = seat
+	tveh.root = mount
+	tveh.vel = Vector3.new()
+	tveh.on = true
+	if not pcall(tveh.makeMovers, mount) or not tveh.isOn() then
+		tveh.on = false
+		notify("vfly", "Could not create the flight parts")
+		return
+	end
+	FLYING = true
+	tveh.renderConn = RunService.RenderStepped:Connect(tveh.step)
+	notify("vfly", "Vehicle fly enabled (speed " .. tostring(vehicleflyspeed) .. ")")
+end
+
 addcmd('fly',{},function(args, speaker)
+	stopVehicleFly(true)
 	stopTweenFly()
 	if not IsOnMobile then
 		NOFLY()
@@ -10940,6 +11118,7 @@ addcmd('flyspeed',{'flysp'},function(args, speaker)
 end)
 
 addcmd('unfly',{'nofly','novfly','unvehiclefly','novehiclefly','unvfly','unfly2','tweenflyoff'},function(args, speaker)
+	stopVehicleFly(true)
 	stopTweenFly()
 	if not IsOnMobile then NOFLY() else unmobilefly(speaker) end
 end)
@@ -10983,24 +11162,20 @@ addcmd('fly2tiltinc',{'tflytiltinc'},function(args, speaker)
 end)
 
 addcmd('vfly',{'vehiclefly'},function(args, speaker)
-	stopTweenFly()
 	if not IsOnMobile then
-		NOFLY()
-		wait()
-		sFLY(true)
+		startVehicleFly(args[1], speaker)
 	else
 		mobilefly(speaker, true)
-	end
-	if args[1] and isNumber(args[1]) then
-		vehicleflyspeed = args[1]
 	end
 end)
 
 addcmd('togglevfly',{},function(args, speaker)
-	if FLYING then
+	if tveh.on then
+		stopVehicleFly()
+	elseif FLYING then
 		if not IsOnMobile then NOFLY() else unmobilefly(speaker) end
 	else
-		if not IsOnMobile then sFLY(true) else mobilefly(speaker, true) end
+		if not IsOnMobile then startVehicleFly(nil, speaker) else mobilefly(speaker, true) end
 	end
 end)
 
@@ -11020,7 +11195,9 @@ addcmd('qefly',{'flyqe'},function(args, speaker)
 end)
 
 addcmd('togglefly',{},function(args, speaker)
-	if FLYING then
+	if tveh.on then
+		stopVehicleFly()
+	elseif FLYING then
 		if not IsOnMobile then NOFLY() else unmobilefly(speaker) end
 	else
 		if not IsOnMobile then sFLY() else mobilefly(speaker) end
@@ -11029,6 +11206,7 @@ end)
 
 CFspeed = 50
 addcmd('cframefly', {'cfly'}, function(args, speaker)
+	stopVehicleFly(true)
 	if args[1] and isNumber(args[1]) then
 		CFspeed = args[1]
 	end
